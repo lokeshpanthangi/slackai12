@@ -29,14 +29,13 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Default workspace members
-  const [workspaceMembers, setWorkspaceMembers] = useState([
-    { id: 'dm-1', name: 'Sarah Wilson', presence: 'active', avatar: 'SW' },
-    { id: 'dm-2', name: 'Mike Chen', presence: 'away', avatar: 'MC' },
-    { id: 'dm-3', name: 'Emma Davis', presence: 'offline', avatar: 'ED' },
-    { id: 'dm-4', name: 'John Smith', presence: 'active', avatar: 'JS' },
-    { id: 'dm-5', name: 'Lisa Brown', presence: 'dnd', avatar: 'LB' },
-  ]);
+  // Start with empty workspace members - no default mock data
+  const [workspaceMembers, setWorkspaceMembers] = useState<Array<{
+    id: string;
+    name: string;
+    presence: string;
+    avatar: string;
+  }>>([]);
 
   const getPresenceColor = (presence: string) => {
     switch (presence) {
@@ -96,32 +95,40 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
             Workspace Members ({filteredMembers.length})
           </h3>
           
-          <div className="space-y-1">
-            {filteredMembers.map((member) => (
-              <Button
-                key={member.id}
-                variant="ghost"
-                onClick={() => onUserSelect(member.id)}
-                className={`w-full justify-start text-white hover:bg-white/10 h-10 text-13 font-normal p-2 ${
-                  selectedDM === member.id ? 'bg-white/20' : ''
-                }`}
-              >
-                <div className="flex items-center w-full">
-                  <div className="relative mr-3">
-                    <div className="w-8 h-8 rounded-md overflow-hidden">
-                      <UserAvatar 
-                        name={member.name} 
-                        size="sm" 
-                        className="w-full h-full"
-                      />
+          {filteredMembers.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-white/60 text-13">
+                No workspace members found.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filteredMembers.map((member) => (
+                <Button
+                  key={member.id}
+                  variant="ghost"
+                  onClick={() => onUserSelect(member.id)}
+                  className={`w-full justify-start text-white hover:bg-white/10 h-10 text-13 font-normal p-2 ${
+                    selectedDM === member.id ? 'bg-white/20' : ''
+                  }`}
+                >
+                  <div className="flex items-center w-full">
+                    <div className="relative mr-3">
+                      <div className="w-8 h-8 rounded-md overflow-hidden">
+                        <UserAvatar 
+                          name={member.name} 
+                          size="sm" 
+                          className="w-full h-full"
+                        />
+                      </div>
+                      <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${getPresenceColor(member.presence)}`} />
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${getPresenceColor(member.presence)}`} />
+                    <span className="truncate">{member.name}</span>
                   </div>
-                  <span className="truncate">{member.name}</span>
-                </div>
-              </Button>
-            ))}
-          </div>
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

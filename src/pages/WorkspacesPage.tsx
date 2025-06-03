@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +29,7 @@ const WorkspacesPage: React.FC = () => {
     slug: ''
   });
 
-  // Initialize workspaces from localStorage or use default mock data
+  // Initialize workspaces from localStorage or start with empty array
   const [userWorkspaces, setUserWorkspaces] = useState<MockWorkspace[]>(() => {
     try {
       const savedWorkspaces = localStorage.getItem('user_workspaces');
@@ -41,27 +40,8 @@ const WorkspacesPage: React.FC = () => {
       console.error('Error loading workspaces from localStorage:', error);
     }
     
-    // Default mock workspaces if none found in localStorage
-    return [
-      {
-        id: '1',
-        name: 'Company HQ',
-        memberCount: 150,
-        avatar: '🏢',
-        isOwner: false,
-        slug: 'company-hq',
-        url: 'company-hq.slack.com'
-      },
-      {
-        id: '2',
-        name: 'Design Team',
-        memberCount: 24,
-        avatar: '🎨',
-        isOwner: true,
-        slug: 'design-team',
-        url: 'design-team.slack.com'
-      }
-    ];
+    // Start with empty array - no default workspaces
+    return [];
   });
 
   const handleLaunchWorkspace = (workspaceId: string) => {
@@ -226,38 +206,46 @@ const WorkspacesPage: React.FC = () => {
               Workspaces for {user?.email}
             </h2>
             
-            <div className="space-y-4">
-              {userWorkspaces.map((workspace) => (
-                <div key={workspace.id} className="flex items-center justify-between p-4 border border-slack-border rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-slack-aubergine rounded-lg flex items-center justify-center text-white text-xl">
-                      {workspace.avatar}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-slack-text-primary">{workspace.name}</h3>
-                      <div className="flex items-center text-sm text-slack-text-secondary">
-                        <Users className="w-4 h-4 mr-1" />
-                        {workspace.memberCount} members
-                        {workspace.isOwner && (
-                          <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-                            Owner
-                          </span>
-                        )}
+            {userWorkspaces.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slack-text-secondary mb-4">
+                  You don't have any workspaces yet. Create one or join an existing workspace to get started.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userWorkspaces.map((workspace) => (
+                  <div key={workspace.id} className="flex items-center justify-between p-4 border border-slack-border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-slack-aubergine rounded-lg flex items-center justify-center text-white text-xl">
+                        {workspace.avatar}
                       </div>
-                      <div className="text-xs text-slack-text-secondary mt-1">
-                        {workspace.url}
+                      <div>
+                        <h3 className="font-semibold text-slack-text-primary">{workspace.name}</h3>
+                        <div className="flex items-center text-sm text-slack-text-secondary">
+                          <Users className="w-4 h-4 mr-1" />
+                          {workspace.memberCount} members
+                          {workspace.isOwner && (
+                            <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                              Owner
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slack-text-secondary mt-1">
+                          {workspace.url}
+                        </div>
                       </div>
                     </div>
+                    <Button
+                      onClick={() => handleLaunchWorkspace(workspace.id)}
+                      className="bg-slack-aubergine hover:bg-slack-aubergine/90 text-white"
+                    >
+                      LAUNCH SLACK
+                    </Button>
                   </div>
-                  <Button
-                    onClick={() => handleLaunchWorkspace(workspace.id)}
-                    className="bg-slack-aubergine hover:bg-slack-aubergine/90 text-white"
-                  >
-                    LAUNCH SLACK
-                  </Button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
