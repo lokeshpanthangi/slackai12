@@ -26,10 +26,7 @@ export const useWorkspaces = () => {
       
       const { data, error } = await supabase
         .from('workspaces')
-        .select(`
-          *,
-          workspace_members!inner(role)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
