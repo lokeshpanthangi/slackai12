@@ -24,6 +24,7 @@ const WorkspacesPage: React.FC = () => {
   });
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
 
   const handleRefresh = () => {
     console.log('Manual refresh triggered');
@@ -34,33 +35,47 @@ const WorkspacesPage: React.FC = () => {
     });
   };
 
-  const handleLaunchWorkspace = (workspaceId: string) => {
+  const handleLaunchWorkspace = async (workspaceId: string) => {
     try {
+      setIsLaunching(true);
       console.log('Launching workspace:', workspaceId);
+      
       const selectedWorkspace = workspaces.find(ws => ws.id === workspaceId);
-      if (selectedWorkspace) {
-        const workspaceData = {
-          id: selectedWorkspace.id,
-          name: selectedWorkspace.name,
-          url: selectedWorkspace.url,
-          slug: selectedWorkspace.slug,
-          isAdmin: selectedWorkspace.created_by === user?.id
-        };
-        
-        console.log('Setting workspace in auth context:', workspaceData);
-        setWorkspace(workspaceData);
-        
-        localStorage.setItem('slack_workspace', JSON.stringify(workspaceData));
-        localStorage.setItem('workspace_selected', 'true');
-        
-        toast({
-          title: 'Workspace Selected',
-          description: `Launching ${selectedWorkspace.name} workspace...`,
-        });
-        
-        console.log('Navigating to dashboard...');
-        navigate('/dashboard');
+      if (!selectedWorkspace) {
+        throw new Error('Workspace not found');
       }
+
+      const workspaceData = {
+        id: selectedWorkspace.id,
+        name: selectedWorkspace.name,
+        url: selectedWorkspace.url,
+        slug: selectedWorkspace.slug,
+        isAdmin: selectedWorkspace.created_by === user?.id
+      };
+      
+      console.log('Setting workspace in auth context:', workspaceData);
+      
+      // Set workspace in context first
+      setWorkspace(workspaceData);
+      
+      // Store in localStorage for persistence
+      localStorage.setItem('slack_workspace', JSON.stringify(workspaceData));
+      localStorage.setItem('workspace_selected', 'true');
+      
+      // Clear any existing navigation state
+      localStorage.removeItem('navigation_state');
+      
+      toast({
+        title: 'Workspace Selected',
+        description: `Launching ${selectedWorkspace.name} workspace...`,
+      });
+      
+      // Small delay to ensure state is set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      console.log('Navigating to dashboard...');
+      navigate('/dashboard', { replace: true });
+      
     } catch (error) {
       console.error('Error launching workspace:', error);
       toast({
@@ -68,6 +83,8 @@ const WorkspacesPage: React.FC = () => {
         description: 'Failed to launch workspace. Please try again.',
         variant: 'destructive'
       });
+    } finally {
+      setIsLaunching(false);
     }
   };
 
@@ -257,8 +274,9 @@ const WorkspacesPage: React.FC = () => {
                     <Button
                       onClick={() => handleLaunchWorkspace(workspace.id)}
                       className="bg-slack-aubergine hover:bg-slack-aubergine/90 text-white"
+                      disabled={isLaunching}
                     >
-                      LAUNCH SLACK
+                      {isLaunching ? 'Launching...' : 'LAUNCH SLACK'}
                     </Button>
                   </div>
                 ))}
