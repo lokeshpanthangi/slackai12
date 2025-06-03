@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,14 +64,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showDirectMessageModal, setShowDirectMessageModal] = useState(false);
   const { messages } = useMessages();
 
-  // Default direct messages data
-  const [directMessages, setDirectMessages] = useState([
-    { id: 'dm-1', name: 'Sarah Wilson', presence: 'active', unreadCount: 1 },
-    { id: 'dm-2', name: 'Mike Chen', presence: 'away', unreadCount: 0 },
-    { id: 'dm-3', name: 'Emma Davis', presence: 'offline', unreadCount: 0 },
-    { id: 'dm-4', name: 'John Smith', presence: 'active', unreadCount: 3 },
-    { id: 'dm-5', name: 'Lisa Brown', presence: 'dnd', unreadCount: 0 },
-  ]);
+  // Remove all mock data - start with empty direct messages
+  const [directMessages, setDirectMessages] = useState([]);
 
   const getPresenceColor = (presence: string) => {
     switch (presence) {
@@ -309,48 +304,54 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className="overflow-hidden"
               >
                 <div className="space-y-1 pt-1">
-                  {filteredDirectMessages.map((dm) => {
-                    const isActive = currentChannel === dm.id;
-                    return (
-                      <motion.div
-                        key={dm.id}
-                        whileHover={{ x: 4 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Button
-                          variant="ghost"
-                          onClick={() => onChannelSelect(dm.id)}
-                          className={`w-full justify-start text-white hover:bg-white/10 h-9 text-base font-normal px-2 transition-all duration-200 ${
-                            isActive ? 'bg-white/20 font-medium' : ''
-                          }`}
+                  {filteredDirectMessages.length === 0 ? (
+                    <div className="text-center py-4">
+                      <p className="text-white/60 text-sm">No direct messages yet</p>
+                    </div>
+                  ) : (
+                    filteredDirectMessages.map((dm) => {
+                      const isActive = currentChannel === dm.id;
+                      return (
+                        <motion.div
+                          key={dm.id}
+                          whileHover={{ x: 4 }}
+                          whileTap={{ scale: 0.98 }}
                         >
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center min-w-0">
-                              <motion.div 
-                                className="relative mr-2 flex-shrink-0"
-                                whileHover={{ scale: 1.1 }}
-                              >
-                                <div className="w-4 h-4 rounded-full overflow-hidden">
-                                  <UserAvatar 
-                                    name={dm.name} 
-                                    size="xs" 
-                                    className="w-full h-full"
-                                  />
-                                </div>
+                          <Button
+                            variant="ghost"
+                            onClick={() => onChannelSelect(dm.id)}
+                            className={`w-full justify-start text-white hover:bg-white/10 h-9 text-base font-normal px-2 transition-all duration-200 ${
+                              isActive ? 'bg-white/20 font-medium' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center min-w-0">
                                 <motion.div 
-                                  className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${getPresenceColor(dm.presence)}`}
-                                  animate={dm.presence === 'active' ? { scale: [1, 1.2, 1] } : {}}
-                                  transition={{ repeat: dm.presence === 'active' ? Infinity : 0, duration: 2 }}
-                                />
-                              </motion.div>
-                              <span className="truncate">{dm.name}</span>
+                                  className="relative mr-2 flex-shrink-0"
+                                  whileHover={{ scale: 1.1 }}
+                                >
+                                  <div className="w-4 h-4 rounded-full overflow-hidden">
+                                    <UserAvatar 
+                                      name={dm.name} 
+                                      size="xs" 
+                                      className="w-full h-full"
+                                    />
+                                  </div>
+                                  <motion.div 
+                                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${getPresenceColor(dm.presence)}`}
+                                    animate={dm.presence === 'active' ? { scale: [1, 1.2, 1] } : {}}
+                                    transition={{ repeat: dm.presence === 'active' ? Infinity : 0, duration: 2 }}
+                                  />
+                                </motion.div>
+                                <span className="truncate">{dm.name}</span>
+                              </div>
+                              {/* Removed unread count numbers */}
                             </div>
-                            {/* Removed unread count numbers */}
-                          </div>
-                        </Button>
-                      </motion.div>
-                    );
-                  })}
+                          </Button>
+                        </motion.div>
+                      );
+                    })
+                  )}
                 </div>
               </motion.div>
             )}
