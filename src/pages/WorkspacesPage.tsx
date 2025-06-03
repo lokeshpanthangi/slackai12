@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const WorkspacesPage: React.FC = () => {
   const { user, logout, setWorkspace } = useAuth();
-  const { workspaces, loading, createWorkspace, joinWorkspace } = useWorkspaces();
+  const { workspaces, setWorkspaces, loading, createWorkspace, joinWorkspace } = useWorkspaces();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [joinWorkspaceUrl, setJoinWorkspaceUrl] = useState('');
@@ -82,22 +82,50 @@ const WorkspacesPage: React.FC = () => {
     
     setIsCreating(true);
     try {
+      // Format URL properly for Supabase schema
       const url = `${createWorkspaceData.slug}.slack.com`;
-      await createWorkspace(createWorkspaceData.name, url, createWorkspaceData.slug);
+      console.log('Creating workspace with data:', {
+        name: createWorkspaceData.name,
+        url,
+        slug: createWorkspaceData.slug
+      });
+      
+      // Call the createWorkspace function
+      const workspace = await createWorkspace(createWorkspaceData.name, url, createWorkspaceData.slug);
+      console.log('Workspace created:', workspace);
       
       // Reset form
       setShowCreateWorkspace(false);
       setCreateWorkspaceData({ name: '', description: '', slug: '' });
       
+      // Force a re-render to show the new workspace
+      // This is a workaround to ensure the UI updates
+      setTimeout(() => {
+        console.log('Forcing re-render to update UI with new workspace');
+        setWorkspaces(currentWorkspaces => {
+          // Check if the workspace is already in the list
+          const exists = currentWorkspaces.some(w => w.id === workspace.id);
+          if (!exists) {
+            console.log('Manually adding new workspace to UI state');
+            return [...currentWorkspaces, workspace];
+          }
+          return [...currentWorkspaces]; // Return a new array to trigger re-render
+        });
+      }, 500);
+      
       toast({
         title: "Success",
-        description: `Workspace ${createWorkspaceData.name} created successfully!`
+        description: `Workspace ${createWorkspaceData.name} created successfully!`,
+        variant: "default"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating workspace:', error);
+      
+      // Provide a more detailed error message if available
+      const errorMessage = error?.message || error?.details || "Failed to create workspace. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to create workspace. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {

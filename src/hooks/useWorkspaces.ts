@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { createWorkspace as apiCreateWorkspace, getUserWorkspaces } from '@/integrations/supabase/workspaceApi';
 
 export interface DatabaseWorkspace {
   id: string;
@@ -14,44 +15,37 @@ export interface DatabaseWorkspace {
   slug?: string;
 }
 
-interface WorkspaceMemberResult {
-  workspace_id: string;
-  workspaces: DatabaseWorkspace;
-}
-
 export const useWorkspaces = () => {
   const [workspaces, setWorkspaces] = useState<DatabaseWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Function to force a refresh of workspaces
+  const refreshWorkspaces = () => {
+    console.log('Manually triggering workspace refresh');
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   useEffect(() => {
-    if (!user) {
+    // Only fetch workspaces when we have a valid session
+    if (session?.user?.id) {
+      console.log('Session or refresh trigger changed, fetching workspaces...');
+      fetchWorkspaces(session.user.id);
+    } else {
       setLoading(false);
-      return;
     }
+  }, [session, refreshTrigger]);
 
-    fetchWorkspaces();
-  }, [user]);
-
-  const fetchWorkspaces = async () => {
+  const fetchWorkspaces = async (userId: string) => {
     try {
+      console.log('Fetching workspaces for user ID:', userId);
       setLoading(true);
-      const { data, error } = await supabase
-        .from('workspace_members')
-        .select(`
-          workspace_id,
-          workspaces!inner(*)
-        `)
-        .eq('user_id', user?.id);
-
-      if (error) throw error;
-
-      // Extract workspace data from the joined query result
-      const workspaceData = data
-        ?.map((item: any) => item.workspaces)
-        .filter((workspace): workspace is DatabaseWorkspace => workspace !== null) || [];
       
-      setWorkspaces(workspaceData);
+      // Use our dedicated API function to get workspaces
+      const data = await getUserWorkspaces(userId);
+      console.log('Workspaces fetched:', data.length || 0);
+      setWorkspaces(data || []);
     } catch (error) {
       console.error('Error fetching workspaces:', error);
     } finally {
@@ -60,35 +54,50 @@ export const useWorkspaces = () => {
   };
 
   const createWorkspace = async (name: string, url: string, slug?: string) => {
+    if (!session?.user?.id) {
+      throw new Error('User not authenticated');
+    }
+    
     try {
-      const { data: workspace, error: workspaceError } = await supabase
-        .from('workspaces')
-        .insert({
-          name,
-          url,
-          slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
-          created_by: user?.id
-        })
-        .select()
-        .single();
-
-      if (workspaceError) throw workspaceError;
-
-      // Add the user as a member of the workspace (this should happen automatically via trigger)
-      const { error: memberError } = await supabase
-        .from('workspace_members')
-        .insert({
-          workspace_id: workspace.id,
-          user_id: user?.id,
-          role: 'admin'
-        });
-
-      if (memberError) {
-        console.error('Error adding workspace member:', memberError);
-        // Don't throw here as the trigger should handle this
-      }
+      const userId = session.user.id;
+      // Generate a slug if not provided
+      const workspaceSlug = slug || name.toLowerCase().replace(/\s+/g, '-');
       
-      await fetchWorkspaces();
+      console.log('Creating workspace for user:', userId);
+      
+      // Create the workspace data object
+      const workspaceData = {
+        name,
+        url,
+        slug: workspaceSlug,
+        created_by: userId
+      };
+      
+      console.log('Workspace data to insert:', workspaceData);
+      
+      // Use our dedicated API function to create the workspace
+      const workspace = await apiCreateWorkspace(workspaceData);
+      console.log('Workspace created successfully:', workspace);
+      
+      // Force a refresh of the workspaces list
+      console.log('Forcing workspace refresh after creation');
+      refreshWorkspaces();
+      
+      // Also directly fetch to ensure we have the latest data
+      console.log('Also directly fetching workspaces to ensure latest data');
+      await fetchWorkspaces(userId);
+      
+      // Manually add the new workspace to the state if it's not already there
+      setWorkspaces(currentWorkspaces => {
+        // Check if the workspace is already in the list
+        const exists = currentWorkspaces.some(w => w.id === workspace.id);
+        if (!exists) {
+          console.log('Manually adding new workspace to state');
+          return [...currentWorkspaces, workspace];
+        }
+        return currentWorkspaces;
+      });
+      
       return workspace;
     } catch (error) {
       console.error('Error creating workspace:', error);
@@ -96,19 +105,29 @@ export const useWorkspaces = () => {
     }
   };
 
-  const joinWorkspace = async (workspaceId: string) => {
+  const joinWorkspace = async (workspaceUrl: string) => {
+    if (!session?.user?.id) {
+      throw new Error('User not authenticated');
+    }
+    
     try {
-      const { error } = await supabase
-        .from('workspace_members')
-        .insert({
-          workspace_id: workspaceId,
-          user_id: user?.id,
-          role: 'member'
-        });
+      const userId = session.user.id;
+      console.log('Joining workspace with URL:', workspaceUrl);
+      
+      // For now, we'll just search for a workspace with the given URL
+      // In a real implementation, you would need a proper invitation system
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('*')
+        .eq('url', workspaceUrl)
+        .single();
 
       if (error) throw error;
       
-      await fetchWorkspaces();
+      // In a real implementation, you would add the user to a workspace_members table
+      // For now, we'll just return the found workspace
+      await fetchWorkspaces(userId);
+      return data;
     } catch (error) {
       console.error('Error joining workspace:', error);
       throw error;
@@ -117,6 +136,7 @@ export const useWorkspaces = () => {
 
   return {
     workspaces,
+    setWorkspaces,
     loading,
     createWorkspace,
     joinWorkspace,
