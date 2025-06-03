@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
 export interface User {
   id: string;
@@ -16,7 +16,7 @@ export interface User {
   presence: 'active' | 'away' | 'offline' | 'dnd';
   timezone: string;
   role: string;
-  workspaceId: string;
+  workspaceId?: string;
 }
 
 export interface Workspace {
@@ -31,10 +31,11 @@ export interface Workspace {
 interface AuthContextType {
   user: User | null;
   workspace: Workspace | null;
+  session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, workspaceUrl?: string) => Promise<void>;
-  signup: (email: string, password: string, displayName: string, workspaceName?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => void;
   updateUserStatus: (status: { text: string; emoji: string; expiration?: Date }) => void;
   updateUserPresence: (presence: 'active' | 'away' | 'offline' | 'dnd') => void;
@@ -58,17 +59,48 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [workspace, setWorkspaceState] = useState<Workspace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = !!user && !!workspace;
+  const isAuthenticated = !!session && !!user;
 
   useEffect(() => {
-    // Check for existing session
+    let mounted = true;
+
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email);
+        
+        if (!mounted) return;
+
+        setSession(session);
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          await loadUserProfile(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setWorkspaceState(null);
+          localStorage.removeItem('slack_workspace');
+          localStorage.removeItem('workspace_selected');
+        }
+        
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    );
+
+    // THEN check for existing session
     const checkSession = async () => {
-      setIsLoading(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('Initial session check:', session?.user?.email);
+        
+        if (!mounted) return;
+        
+        setSession(session);
         
         if (session?.user) {
           await loadUserProfile(session.user);
@@ -76,30 +108,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Also check localStorage for workspace selection
         const savedWorkspace = localStorage.getItem('slack_workspace');
-        if (savedWorkspace) {
-          setWorkspaceState(JSON.parse(savedWorkspace));
+        if (savedWorkspace && mounted) {
+          try {
+            setWorkspaceState(JSON.parse(savedWorkspace));
+          } catch (error) {
+            console.error('Error parsing saved workspace:', error);
+            localStorage.removeItem('slack_workspace');
+          }
         }
       } catch (error) {
         console.error('Error checking session:', error);
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     checkSession();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        await loadUserProfile(session.user);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setWorkspaceState(null);
-      }
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
@@ -111,7 +142,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('Error loading user profile:', error);
+        return;
       }
 
       const userData: User = {
@@ -125,18 +157,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         },
         presence: profile?.presence || 'offline',
         timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-        role: 'Member',
-        workspaceId: '1'
+        role: 'Member'
       };
 
+      console.log('User profile loaded:', userData.email);
       setUser(userData);
-      localStorage.setItem('slack_user', JSON.stringify(userData));
     } catch (error) {
       console.error('Error loading user profile:', error);
     }
   };
 
-  const login = async (email: string, password: string, workspaceUrl?: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -146,21 +177,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) throw error;
 
-      if (data.user) {
-        await loadUserProfile(data.user);
-      }
-
-      // Handle workspace logic (mock for now)
-      const mockWorkspace: Workspace = {
-        id: '1',
-        name: workspaceUrl || 'My Workspace',
-        url: workspaceUrl || 'my-workspace',
-        isAdmin: false
-      };
-
-      setWorkspaceState(mockWorkspace);
-      localStorage.setItem('slack_workspace', JSON.stringify(mockWorkspace));
-      localStorage.removeItem('workspace_selected');
+      console.log('Login successful:', data.user?.email);
+      // Session will be handled by the auth state change listener
     } catch (error) {
       console.error('Login error:', error);
       throw new Error('Login failed');
@@ -169,7 +187,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (email: string, password: string, displayName: string, workspaceName?: string) => {
+  const signup = async (email: string, password: string, displayName: string) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -178,39 +196,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         options: {
           data: {
             display_name: displayName
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/`
         }
       });
 
       if (error) throw error;
 
-      if (data.user) {
-        // Create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            email: data.user.email!,
-            display_name: displayName
-          });
-
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
-        }
-
-        await loadUserProfile(data.user);
-      }
-
-      // Handle workspace logic (mock for now)
-      const mockWorkspace: Workspace = {
-        id: '1',
-        name: workspaceName || 'My Workspace',
-        url: workspaceName?.toLowerCase().replace(/\s+/g, '-') || 'my-workspace',
-        isAdmin: !!workspaceName
-      };
-
-      setWorkspaceState(mockWorkspace);
-      localStorage.setItem('slack_workspace', JSON.stringify(mockWorkspace));
+      console.log('Signup successful:', data.user?.email);
+      
+      // If user is created, the profile will be created automatically via trigger
+      // Session will be handled by the auth state change listener
     } catch (error) {
       console.error('Signup error:', error);
       throw new Error('Signup failed');
@@ -223,12 +219,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await supabase.auth.signOut();
       setUser(null);
+      setSession(null);
       setWorkspaceState(null);
-      localStorage.removeItem('slack_user');
       localStorage.removeItem('slack_workspace');
       localStorage.removeItem('workspace_selected');
       
-      window.location.href = '/';
+      console.log('Logout successful');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -250,7 +246,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         const updatedUser = { ...user, status };
         setUser(updatedUser);
-        localStorage.setItem('slack_user', JSON.stringify(updatedUser));
       } catch (error) {
         console.error('Error updating user status:', error);
       }
@@ -269,7 +264,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         const updatedUser = { ...user, presence };
         setUser(updatedUser);
-        localStorage.setItem('slack_user', JSON.stringify(updatedUser));
       } catch (error) {
         console.error('Error updating user presence:', error);
       }
@@ -289,11 +283,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const setWorkspace = (newWorkspace: Workspace) => {
     setWorkspaceState(newWorkspace);
     localStorage.setItem('slack_workspace', JSON.stringify(newWorkspace));
+    localStorage.setItem('workspace_selected', 'true');
   };
 
   const value: AuthContextType = {
     user,
     workspace,
+    session,
     isAuthenticated,
     isLoading,
     login,

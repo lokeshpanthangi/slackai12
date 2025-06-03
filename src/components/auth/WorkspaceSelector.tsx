@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +17,7 @@ const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
 }) => {
   const [workspaceUrl, setWorkspaceUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,13 +25,18 @@ const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
 
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      onWorkspaceSelect(workspaceUrl);
+      // Navigate to workspaces page where user can see their actual workspaces
+      navigate('/workspaces');
     } catch (error) {
       console.error('Error finding workspace:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCreateWorkspace = () => {
+    // Navigate to workspaces page where user can create a workspace
+    navigate('/workspaces');
   };
 
   return (
@@ -81,7 +88,7 @@ const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
               <Button
                 type="submit"
                 className="w-full bg-slack-aubergine hover:bg-slack-aubergine/90 text-white font-bold h-11 rounded-slack-md"
-                disabled={isLoading || !workspaceUrl.trim()}
+                disabled={isLoading}
               >
                 {isLoading ? 'Finding workspace...' : 'Continue'}
                 <ArrowRight className="ml-2 w-4 h-4" />
@@ -102,7 +109,7 @@ const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
 
           <Button
             variant="outline"
-            onClick={onCreateWorkspace}
+            onClick={handleCreateWorkspace}
             className="w-full border-slack text-slack-text-primary hover:bg-slack-white h-11 rounded-slack-md"
           >
             Create a new workspace

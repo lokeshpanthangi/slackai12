@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/auth/LoginForm';
 import SignUpForm from '@/components/auth/SignUpForm';
@@ -9,12 +8,8 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout';
 type AuthStep = 'login' | 'signup';
 
 const Index: React.FC = () => {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, workspace } = useAuth();
   const [authStep, setAuthStep] = useState<AuthStep>('login');
-  const [showWorkspaces, setShowWorkspaces] = useState(() => {
-    // Check if workspace is selected from localStorage
-    return localStorage.getItem('workspace_selected') === 'true';
-  });
 
   if (isLoading) {
     return (
@@ -29,26 +24,18 @@ const Index: React.FC = () => {
     );
   }
 
-  // After authentication, check if workspace is selected
+  // If user is authenticated
   if (isAuthenticated) {
-    // Check if workspace is selected from localStorage
-    const workspaceSelected = localStorage.getItem('workspace_selected') === 'true';
+    // Check if workspace is selected
+    const workspaceSelected = localStorage.getItem('workspace_selected') === 'true' || !!workspace;
     
     // If workspace is selected, show dashboard
-    if (workspaceSelected) {
+    if (workspaceSelected && workspace) {
       return <DashboardLayout />;
     } else {
       // Otherwise show workspaces page
       return <WorkspacesPage />;
     }
-  }
-  
-  // Check if there's a stored user but not authenticated yet
-  // This handles the case where a user has logged in before but the session isn't active
-  const storedUser = localStorage.getItem('slack_user');
-  if (storedUser && !isAuthenticated && !isLoading) {
-    // Show workspaces page without requiring re-authentication
-    return <WorkspacesPage />;
   }
 
   const handleSwitchToSignUp = () => {

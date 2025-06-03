@@ -1,24 +1,19 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspaces } from '@/hooks/useWorkspaces';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, LogOut, X } from 'lucide-react';
-
-interface MockWorkspace {
-  id: string;
-  name: string;
-  memberCount: number;
-  avatar: string;
-  isOwner: boolean;
-  slug: string;
-  url: string;
-}
+import { Plus, Users, LogOut } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const WorkspacesPage: React.FC = () => {
   const { user, logout, setWorkspace } = useAuth();
+  const { workspaces, loading, createWorkspace, joinWorkspace } = useWorkspaces();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [joinWorkspaceUrl, setJoinWorkspaceUrl] = useState('');
   const [showJoinForm, setShowJoinForm] = useState(false);
@@ -28,145 +23,118 @@ const WorkspacesPage: React.FC = () => {
     description: '',
     slug: ''
   });
-
-  // Initialize workspaces from localStorage or start with empty array
-  const [userWorkspaces, setUserWorkspaces] = useState<MockWorkspace[]>(() => {
-    try {
-      const savedWorkspaces = localStorage.getItem('user_workspaces');
-      if (savedWorkspaces) {
-        return JSON.parse(savedWorkspaces);
-      }
-    } catch (error) {
-      console.error('Error loading workspaces from localStorage:', error);
-    }
-    
-    // Start with empty array - no default workspaces
-    return [];
-  });
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   const handleLaunchWorkspace = (workspaceId: string) => {
     console.log('Launching workspace:', workspaceId);
-    const selectedWorkspace = userWorkspaces.find(ws => ws.id === workspaceId);
+    const selectedWorkspace = workspaces.find(ws => ws.id === workspaceId);
     if (selectedWorkspace) {
-      // First check if user is already authenticated
-      const savedUser = localStorage.getItem('slack_user');
-      
-      if (!user && savedUser) {
-        // If we have a saved user but not authenticated in context,
-        // restore the user from localStorage to avoid re-authentication
-        const parsedUser = JSON.parse(savedUser);
-        // This would normally be handled by a proper auth system
-        // For this mock, we're just ensuring the user stays logged in
-      }
-      
-      // First, store the workspace data in localStorage
+      // Create workspace data compatible with auth context
       const workspaceData = {
         id: selectedWorkspace.id,
         name: selectedWorkspace.name,
         url: selectedWorkspace.url,
         slug: selectedWorkspace.slug,
-        isAdmin: selectedWorkspace.isOwner
+        isAdmin: selectedWorkspace.created_by === user?.id
       };
-      
-      localStorage.setItem('slack_workspace', JSON.stringify(workspaceData));
-      
-      // Store a flag in localStorage to indicate workspace is selected
-      localStorage.setItem('workspace_selected', 'true');
       
       // Set the workspace in auth context
       setWorkspace(workspaceData);
       
-      // Use a small timeout to ensure state updates before navigation
-      setTimeout(() => {
-        // Navigate to dashboard - use replace to avoid going back to workspaces
-        navigate('/', { replace: true });
-      }, 100);
+      // Navigate to dashboard
+      navigate('/', { replace: true });
     }
   };
 
-  const handleCreateWorkspace = () => {
+  const handleCreateWorkspace = async () => {
     // Validate form
     if (!createWorkspaceData.name || !createWorkspaceData.slug) {
-      alert('Please fill in all required fields');
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
       return;
     }
     
-    // Create a new workspace
-    const newWorkspace: MockWorkspace = {
-      id: `ws_${Date.now()}`, // Generate a unique ID
-      name: createWorkspaceData.name,
-      memberCount: 1, // Start with just the creator
-      avatar: '🚀', // Default avatar
-      isOwner: true,
-      slug: createWorkspaceData.slug,
-      url: `${createWorkspaceData.slug}.slack.com`
-    };
-    
-    // Add to user workspaces
-    const updatedWorkspaces = [...userWorkspaces, newWorkspace];
-    setUserWorkspaces(updatedWorkspaces);
-    
-    // Save to localStorage
-    localStorage.setItem('user_workspaces', JSON.stringify(updatedWorkspaces));
-    
-    // Reset form
-    setShowCreateWorkspace(false);
-    setCreateWorkspaceData({ name: '', description: '', slug: '' });
-    
-    // Show success message
-    alert(`Workspace ${newWorkspace.name} created successfully!`);
+    setIsCreating(true);
+    try {
+      const url = `${createWorkspaceData.slug}.slack.com`;
+      await createWorkspace(createWorkspaceData.name, url, createWorkspaceData.slug);
+      
+      // Reset form
+      setShowCreateWorkspace(false);
+      setCreateWorkspaceData({ name: '', description: '', slug: '' });
+      
+      toast({
+        title: "Success",
+        description: `Workspace ${createWorkspaceData.name} created successfully!`
+      });
+    } catch (error) {
+      console.error('Error creating workspace:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create workspace. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleJoinWorkspace = () => {
+  const handleJoinWorkspace = async () => {
     // Validate URL
     if (!joinWorkspaceUrl) {
-      alert('Please enter a valid workspace URL');
+      toast({
+        title: "Error",
+        description: "Please enter a valid workspace URL",
+        variant: "destructive"
+      });
       return;
     }
     
-    // In a real app, this would make an API call to join the workspace
-    // For this mock, we'll create a fake workspace based on the URL
-    
-    // Extract workspace name from URL
-    let workspaceName = joinWorkspaceUrl;
+    setIsJoining(true);
     try {
-      // Try to extract domain from URL
-      const url = new URL(joinWorkspaceUrl);
-      workspaceName = url.hostname.split('.')[0];
-    } catch (e) {
-      // If not a valid URL, use as is
-      workspaceName = joinWorkspaceUrl.replace(/[^a-zA-Z0-9-]/g, '-');
+      // For now, since we don't have a workspace discovery mechanism,
+      // we'll show an error message
+      toast({
+        title: "Feature Coming Soon",
+        description: "Joining existing workspaces by URL is not yet implemented. Please ask a workspace admin to invite you.",
+        variant: "destructive"
+      });
+      
+      // Reset form
+      setJoinWorkspaceUrl('');
+      setShowJoinForm(false);
+    } catch (error) {
+      console.error('Error joining workspace:', error);
+      toast({
+        title: "Error",
+        description: "Failed to join workspace. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsJoining(false);
     }
-    
-    // Create a new workspace
-    const newWorkspace: MockWorkspace = {
-      id: `ws_${Date.now()}`, // Generate a unique ID
-      name: workspaceName.charAt(0).toUpperCase() + workspaceName.slice(1),
-      memberCount: Math.floor(Math.random() * 50) + 5, // Random member count
-      avatar: '🔗', // Default avatar for joined workspaces
-      isOwner: false,
-      slug: workspaceName.toLowerCase(),
-      url: `${workspaceName.toLowerCase()}.slack.com`
-    };
-    
-    // Add to user workspaces
-    const updatedWorkspaces = [...userWorkspaces, newWorkspace];
-    setUserWorkspaces(updatedWorkspaces);
-    
-    // Save to localStorage
-    localStorage.setItem('user_workspaces', JSON.stringify(updatedWorkspaces));
-    
-    // Reset form
-    setJoinWorkspaceUrl('');
-    setShowJoinForm(false);
-    
-    // Show success message
-    alert(`You've joined the ${newWorkspace.name} workspace!`);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slack-aubergine via-purple-700 to-slack-dark-aubergine flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
+            <div className="w-8 h-8 border-2 border-slack-aubergine border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-white">Loading workspaces...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slack-aubergine via-purple-700 to-slack-dark-aubergine">
-      {/* Simplified Header - Only Logo/Name */}
+      {/* Header */}
       <header className="bg-black/20 backdrop-blur-sm border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -206,7 +174,7 @@ const WorkspacesPage: React.FC = () => {
               Workspaces for {user?.email}
             </h2>
             
-            {userWorkspaces.length === 0 ? (
+            {workspaces.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-slack-text-secondary mb-4">
                   You don't have any workspaces yet. Create one or join an existing workspace to get started.
@@ -214,19 +182,19 @@ const WorkspacesPage: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {userWorkspaces.map((workspace) => (
+                {workspaces.map((workspace) => (
                   <div key={workspace.id} className="flex items-center justify-between p-4 border border-slack-border rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-slack-aubergine rounded-lg flex items-center justify-center text-white text-xl">
-                        {workspace.avatar}
+                        {workspace.icon || workspace.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <h3 className="font-semibold text-slack-text-primary">{workspace.name}</h3>
                         <div className="flex items-center text-sm text-slack-text-secondary">
                           <Users className="w-4 h-4 mr-1" />
-                          {workspace.memberCount} members
-                          {workspace.isOwner && (
-                            <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                          <span className="mr-2">Workspace</span>
+                          {workspace.created_by === user?.id && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
                               Owner
                             </span>
                           )}
@@ -306,15 +274,15 @@ const WorkspacesPage: React.FC = () => {
                   placeholder="Enter workspace URL, code, or invite link"
                   value={joinWorkspaceUrl}
                   onChange={(e) => setJoinWorkspaceUrl(e.target.value)}
-                  className="text-15 bg-chat-dark border-gray-400 text-white placeholder:text-gray-400"
+                  className="text-15"
                 />
                 <div className="flex space-x-2">
                   <Button
                     onClick={handleJoinWorkspace}
                     className="bg-slack-aubergine hover:bg-slack-aubergine/90 text-white flex-1"
-                    disabled={!joinWorkspaceUrl.trim()}
+                    disabled={!joinWorkspaceUrl.trim() || isJoining}
                   >
-                    Join Workspace
+                    {isJoining ? 'Joining...' : 'Join Workspace'}
                   </Button>
                   <Button
                     onClick={() => {
@@ -346,7 +314,6 @@ const WorkspacesPage: React.FC = () => {
                 placeholder="e.g. My Company"
                 value={createWorkspaceData.name}
                 onChange={(e) => setCreateWorkspaceData(prev => ({ ...prev, name: e.target.value }))}
-                className="bg-chat-dark border-gray-400 text-white placeholder:text-gray-400"
               />
             </div>
             <div>
@@ -355,7 +322,6 @@ const WorkspacesPage: React.FC = () => {
                 placeholder="What's this workspace for?"
                 value={createWorkspaceData.description}
                 onChange={(e) => setCreateWorkspaceData(prev => ({ ...prev, description: e.target.value }))}
-                className="bg-chat-dark border-gray-400 text-white placeholder:text-gray-400"
               />
             </div>
             <div>
@@ -365,7 +331,7 @@ const WorkspacesPage: React.FC = () => {
                   placeholder="my-company"
                   value={createWorkspaceData.slug}
                   onChange={(e) => setCreateWorkspaceData(prev => ({ ...prev, slug: e.target.value }))}
-                  className="rounded-r-none bg-chat-dark border-gray-400 text-white placeholder:text-gray-400"
+                  className="rounded-r-none"
                 />
                 <span className="bg-gray-100 border border-l-0 px-3 py-2 text-sm text-gray-600 rounded-r-md">
                   .slack.com
@@ -375,10 +341,10 @@ const WorkspacesPage: React.FC = () => {
             <div className="flex space-x-2 pt-4">
               <Button
                 onClick={handleCreateWorkspace}
-                disabled={!createWorkspaceData.name.trim()}
+                disabled={!createWorkspaceData.name.trim() || isCreating}
                 className="flex-1"
               >
-                Create Workspace
+                {isCreating ? 'Creating...' : 'Create Workspace'}
               </Button>
               <Button
                 variant="outline"
