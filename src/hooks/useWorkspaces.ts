@@ -15,6 +15,12 @@ export interface DatabaseWorkspace {
   slug?: string;
 }
 
+interface WorkspaceMemberRow {
+  workspace_id: string;
+  role: string;
+  workspaces: DatabaseWorkspace;
+}
+
 export const useWorkspaces = () => {
   const [workspaces, setWorkspaces] = useState<DatabaseWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,10 +100,9 @@ export const useWorkspaces = () => {
 
       console.log('Raw workspace memberships:', memberWorkspaces);
 
-      // Extract workspace data from the join - handle the actual structure
-      const workspaceData: DatabaseWorkspace[] = memberWorkspaces
+      // Extract workspace data from the join with proper typing
+      const workspaceData: DatabaseWorkspace[] = (memberWorkspaces as WorkspaceMemberRow[])
         ?.map(member => {
-          // The workspaces field should be a single object, not an array
           const workspace = member.workspaces;
           
           // Ensure workspace exists and has the required properties
