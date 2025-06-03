@@ -48,7 +48,7 @@ export const useWorkspaces = () => {
         .select(`
           workspace_id,
           role,
-          workspaces (
+          workspaces!inner (
             id,
             name,
             url,
@@ -71,8 +71,8 @@ export const useWorkspaces = () => {
       // Extract workspace data from the join - handle the actual structure
       const workspaceData: DatabaseWorkspace[] = memberWorkspaces
         ?.map(member => {
-          // Handle the case where workspaces might be an array or null
-          const workspace = Array.isArray(member.workspaces) ? member.workspaces[0] : member.workspaces;
+          // The workspaces field should be a single object, not an array
+          const workspace = member.workspaces;
           
           // Ensure workspace exists and has the required properties
           if (workspace && typeof workspace === 'object') {
