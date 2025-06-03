@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,7 +7,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Users, LogOut, X } from 'lucide-react';
-import { initializeTest01Workspace } from '@/data/test01-workspace';
 
 interface MockWorkspace {
   id: string;
@@ -31,33 +31,18 @@ const WorkspacesPage: React.FC = () => {
   });
 
   // Initialize workspaces from localStorage or use default mock data
-  // Initialize Test01 workspace data when component mounts
-  useEffect(() => {
-    // Initialize Test01 workspace data with channels and participants
-    // Make Test01 workspace available to all users
-    initializeTest01Workspace();
-  }, []);
-
   const [userWorkspaces, setUserWorkspaces] = useState<MockWorkspace[]>(() => {
     try {
       const savedWorkspaces = localStorage.getItem('user_workspaces');
       if (savedWorkspaces) {
-        const parsedWorkspaces = JSON.parse(savedWorkspaces);
-        // Filter workspaces based on user email
-        if (user?.email === 'nanibroly@gmail.com') {
-          // Show all workspaces including Test01 for nanibroly@gmail.com
-          return parsedWorkspaces;
-        } else {
-          // Hide Test01 workspace for other users
-          return parsedWorkspaces.filter((ws: MockWorkspace) => ws.id !== '3');
-        }
+        return JSON.parse(savedWorkspaces);
       }
     } catch (error) {
       console.error('Error loading workspaces from localStorage:', error);
     }
     
     // Default mock workspaces if none found in localStorage
-    const defaultWorkspaces = [
+    return [
       {
         id: '1',
         name: 'Company HQ',
@@ -77,21 +62,6 @@ const WorkspacesPage: React.FC = () => {
         url: 'design-team.slack.com'
       }
     ];
-    
-    // Add Test01 workspace only for nanibroly@gmail.com
-    if (user?.email === 'nanibroly@gmail.com') {
-      defaultWorkspaces.push({
-        id: '3', 
-        name: 'Test01',
-        memberCount: 7,
-        avatar: '🧪',
-        isOwner: true,
-        slug: 'test01',
-        url: 'test01.slack.com'
-      });
-    }
-    
-    return defaultWorkspaces;
   });
 
   const handleLaunchWorkspace = (workspaceId: string) => {

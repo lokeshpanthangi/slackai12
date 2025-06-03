@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageProvider, useMessages } from '@/contexts/MessageContext';
@@ -13,7 +12,6 @@ import CreateChannelModal from './CreateChannelModal';
 import SearchModal from './SearchModal';
 import WorkspaceSettings from './WorkspaceSettings';
 import AIChatbox from './AIChatbox';
-import { addTechChannelMockData } from '@/utils/addTechChannelMockData';
 
 // Define the Channel interface
 interface Channel {
@@ -37,12 +35,6 @@ const DashboardContent: React.FC = () => {
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false);
   const [showAIChatbox, setShowAIChatbox] = useState(false);
   const [favoriteChannel, setFavoriteChannel] = useState('general');
-  
-  // Initialize mock data for Tech channel
-  useEffect(() => {
-    // Add mock threads with replies to the Tech channel
-    addTechChannelMockData();
-  }, []);
   
   // Initialize channels from localStorage or use default channels
   const [channels, setChannels] = useState<Channel[]>(() => {
@@ -235,4 +227,3 @@ const DashboardLayout: React.FC = () => {
 };
 
 export default DashboardLayout;
-
