@@ -101,7 +101,7 @@ export const useWorkspaces = () => {
           const workspace = member.workspaces;
           
           // Ensure workspace exists and has the required properties
-          if (workspace && typeof workspace === 'object') {
+          if (workspace && typeof workspace === 'object' && !Array.isArray(workspace)) {
             return {
               id: workspace.id,
               name: workspace.name,
