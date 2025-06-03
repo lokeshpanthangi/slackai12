@@ -68,10 +68,26 @@ export const useWorkspaces = () => {
 
       console.log('Raw workspace memberships:', memberWorkspaces);
 
-      // Extract workspace data from the join
-      const workspaceData = memberWorkspaces
-        ?.map(member => member.workspaces)
-        .filter(Boolean) as DatabaseWorkspace[] || [];
+      // Extract workspace data from the join and properly type it
+      const workspaceData: DatabaseWorkspace[] = memberWorkspaces
+        ?.map(member => {
+          const workspace = member.workspaces;
+          // Ensure workspace exists and has the required properties
+          if (workspace && typeof workspace === 'object' && !Array.isArray(workspace)) {
+            return {
+              id: workspace.id,
+              name: workspace.name,
+              url: workspace.url,
+              slug: workspace.slug,
+              icon: workspace.icon,
+              created_by: workspace.created_by,
+              created_at: workspace.created_at,
+              updated_at: workspace.updated_at
+            } as DatabaseWorkspace;
+          }
+          return null;
+        })
+        .filter((workspace): workspace is DatabaseWorkspace => workspace !== null) || [];
 
       console.log('Processed workspaces:', workspaceData);
       setWorkspaces(workspaceData);
@@ -157,6 +173,7 @@ export const useWorkspaces = () => {
     loading,
     createWorkspace,
     joinWorkspace,
-    refetch: () => fetchWorkspaces(session?.user?.id || '')
+    refetch: () => fetchWorkspaces(session?.user?.id || ''),
+    refreshWorkspaces
   };
 };
