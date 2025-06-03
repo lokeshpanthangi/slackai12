@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const WorkspacesPage: React.FC = () => {
   const { user, logout, setWorkspace } = useAuth();
-  const { workspaces, setWorkspaces, loading, createWorkspace, joinWorkspace, refetch } = useWorkspaces();
+  const { workspaces, loading, createWorkspace, joinWorkspace, refetch } = useWorkspaces();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [joinWorkspaceUrl, setJoinWorkspaceUrl] = useState('');
@@ -24,15 +25,6 @@ const WorkspacesPage: React.FC = () => {
   });
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-
-  // Add debugging info on mount
-  useEffect(() => {
-    console.log('WorkspacesPage mounted with auth state:', {
-      user: user ? { id: user.id, email: user.email } : null,
-      workspacesCount: workspaces.length,
-      loading
-    });
-  }, [user, workspaces, loading]);
 
   const handleRefresh = () => {
     console.log('Manual refresh triggered');
@@ -48,7 +40,6 @@ const WorkspacesPage: React.FC = () => {
       console.log('Launching workspace:', workspaceId);
       const selectedWorkspace = workspaces.find(ws => ws.id === workspaceId);
       if (selectedWorkspace) {
-        // Create workspace data compatible with auth context
         const workspaceData = {
           id: selectedWorkspace.id,
           name: selectedWorkspace.name,
@@ -58,20 +49,16 @@ const WorkspacesPage: React.FC = () => {
         };
         
         console.log('Setting workspace in auth context:', workspaceData);
-        // Set the workspace in auth context
         setWorkspace(workspaceData);
         
-        // Store workspace in localStorage
         localStorage.setItem('slack_workspace', JSON.stringify(workspaceData));
         localStorage.setItem('workspace_selected', 'true');
         
-        // Show success message
         toast({
           title: 'Workspace Selected',
           description: `Launching ${selectedWorkspace.name} workspace...`,
         });
         
-        // Navigate to dashboard
         console.log('Navigating to dashboard...');
         navigate('/dashboard');
       }
@@ -86,7 +73,6 @@ const WorkspacesPage: React.FC = () => {
   };
 
   const handleCreateWorkspace = async () => {
-    // Validate form
     if (!createWorkspaceData.name || !createWorkspaceData.slug) {
       toast({
         title: "Error",
@@ -98,7 +84,6 @@ const WorkspacesPage: React.FC = () => {
     
     setIsCreating(true);
     try {
-      // Format URL properly for Supabase schema
       const url = `${createWorkspaceData.slug}.slack.com`;
       console.log('Creating workspace with data:', {
         name: createWorkspaceData.name,
@@ -106,11 +91,9 @@ const WorkspacesPage: React.FC = () => {
         slug: createWorkspaceData.slug
       });
       
-      // Call the createWorkspace function
       const workspace = await createWorkspace(createWorkspaceData.name, url, createWorkspaceData.slug);
       console.log('Workspace created:', workspace);
       
-      // Reset form
       setShowCreateWorkspace(false);
       setCreateWorkspaceData({ name: '', description: '', slug: '' });
       
@@ -122,7 +105,6 @@ const WorkspacesPage: React.FC = () => {
     } catch (error: any) {
       console.error('Error creating workspace:', error);
       
-      // Provide a more detailed error message if available
       const errorMessage = error?.message || error?.details || "Failed to create workspace. Please try again.";
       toast({
         title: "Error",
@@ -135,11 +117,10 @@ const WorkspacesPage: React.FC = () => {
   };
 
   const handleJoinWorkspace = async () => {
-    // Validate URL
     if (!joinWorkspaceUrl) {
       toast({
         title: "Error",
-        description: "Please enter a valid workspace URL",
+        description: "Please enter a valid workspace URL or ID",
         variant: "destructive"
       });
       return;
@@ -147,22 +128,22 @@ const WorkspacesPage: React.FC = () => {
     
     setIsJoining(true);
     try {
-      // For now, since we don't have a workspace discovery mechanism,
-      // we'll show an error message
+      console.log('Attempting to join workspace:', joinWorkspaceUrl);
+      const result = await joinWorkspace(joinWorkspaceUrl);
+      
       toast({
-        title: "Feature Coming Soon",
-        description: "Joining existing workspaces by URL is not yet implemented. Please ask a workspace admin to invite you.",
-        variant: "destructive"
+        title: "Success",
+        description: result.message || "Successfully joined workspace!",
+        variant: "default"
       });
       
-      // Reset form
       setJoinWorkspaceUrl('');
       setShowJoinForm(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error joining workspace:', error);
       toast({
         title: "Error",
-        description: "Failed to join workspace. Please try again.",
+        description: error.message || "Failed to join workspace. Please check the URL/ID and try again.",
         variant: "destructive"
       });
     } finally {
@@ -228,17 +209,6 @@ const WorkspacesPage: React.FC = () => {
             <h1 className="text-5xl font-bold text-white">Welcome back</h1>
           </div>
         </div>
-
-        {/* Debug Info */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mb-8 p-4 bg-black/20 rounded-lg text-white text-xs">
-            <p>Debug Info:</p>
-            <p>User ID: {user?.id || 'null'}</p>
-            <p>User Email: {user?.email || 'null'}</p>
-            <p>Workspaces Count: {workspaces.length}</p>
-            <p>Loading: {loading.toString()}</p>
-          </div>
-        )}
 
         {/* User Workspaces Section */}
         <div className="mb-12">
@@ -352,7 +322,7 @@ const WorkspacesPage: React.FC = () => {
               <h3 className="font-semibold text-slack-text-primary mb-4">Join a workspace</h3>
               <div className="space-y-4">
                 <Input
-                  placeholder="Enter workspace URL, code, or invite link"
+                  placeholder="Enter workspace URL, ID, or slug"
                   value={joinWorkspaceUrl}
                   onChange={(e) => setJoinWorkspaceUrl(e.target.value)}
                   className="text-15"

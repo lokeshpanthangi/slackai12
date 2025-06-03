@@ -19,37 +19,49 @@ export const useChannels = (workspaceId?: string) => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (!user || !workspaceId) {
+  const fetchChannels = async () => {
+    if (!workspaceId || !user) {
       setLoading(false);
       return;
     }
 
-    fetchChannels();
-  }, [user, workspaceId]);
-
-  const fetchChannels = async () => {
-    if (!workspaceId) return;
-
     try {
       setLoading(true);
+      console.log('Fetching channels for workspace:', workspaceId);
+      
       const { data, error } = await supabase
         .from('channels')
         .select('*')
         .eq('workspace_id', workspaceId)
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching channels:', error);
+        throw error;
+      }
+      
+      console.log('Fetched channels:', data);
       setChannels(data || []);
     } catch (error) {
       console.error('Error fetching channels:', error);
+      setChannels([]);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchChannels();
+  }, [user, workspaceId]);
+
   const createChannel = async (name: string, description?: string, isPrivate = false) => {
+    if (!workspaceId || !user?.id) {
+      throw new Error('Workspace ID and user required');
+    }
+
     try {
+      console.log('Creating channel:', { name, description, isPrivate, workspaceId });
+      
       const { data, error } = await supabase
         .from('channels')
         .insert({
@@ -57,13 +69,17 @@ export const useChannels = (workspaceId?: string) => {
           description,
           is_private: isPrivate,
           workspace_id: workspaceId,
-          created_by: user?.id
+          created_by: user.id
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating channel:', error);
+        throw error;
+      }
       
+      console.log('Channel created successfully:', data);
       await fetchChannels();
       return data;
     } catch (error) {

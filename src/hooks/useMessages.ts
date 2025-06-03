@@ -25,6 +25,40 @@ export const useMessages = (channelId?: string) => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
+  const fetchMessages = async () => {
+    if (!channelId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('Fetching messages for channel:', channelId);
+      
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          profiles(display_name, avatar)
+        `)
+        .eq('channel_id', channelId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        throw error;
+      }
+      
+      console.log('Fetched messages:', data);
+      setMessages(data || []);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!channelId) {
       setLoading(false);
@@ -33,7 +67,7 @@ export const useMessages = (channelId?: string) => {
 
     fetchMessages();
     
-    // Set up real-time subscription
+    // Set up real-time subscription for new messages
     const channel = supabase
       .channel(`messages-${channelId}`)
       .on(
@@ -45,6 +79,7 @@ export const useMessages = (channelId?: string) => {
           filter: `channel_id=eq.${channelId}`
         },
         (payload) => {
+          console.log('New message received:', payload.new);
           setMessages(prev => [...prev, payload.new as DatabaseMessage]);
         }
       )
@@ -55,43 +90,31 @@ export const useMessages = (channelId?: string) => {
     };
   }, [channelId]);
 
-  const fetchMessages = async () => {
-    if (!channelId) return;
-
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          profiles(display_name, avatar)
-        `)
-        .eq('channel_id', channelId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const sendMessage = async (content: string, parentMessageId?: string) => {
+    if (!channelId || !user?.id) {
+      throw new Error('Channel ID and user required');
+    }
+
     try {
+      console.log('Sending message:', { content, channelId, userId: user.id });
+      
       const { data, error } = await supabase
         .from('messages')
         .insert({
           content,
           channel_id: channelId,
-          user_id: user?.id,
+          user_id: user.id,
           parent_message_id: parentMessageId
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error sending message:', error);
+        throw error;
+      }
+      
+      console.log('Message sent successfully:', data);
       return data;
     } catch (error) {
       console.error('Error sending message:', error);

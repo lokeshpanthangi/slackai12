@@ -424,9 +424,22 @@ export type Database = {
         Args: { channel_id: string; user_id: string }
         Returns: boolean
       }
+      is_workspace_admin: {
+        Args: { workspace_id: string; user_id: string }
+        Returns: boolean
+      }
       is_workspace_member: {
         Args: { workspace_id: string; user_id: string }
         Returns: boolean
+      }
+      join_workspace_by_identifier: {
+        Args: { identifier: string }
+        Returns: {
+          workspace_id: string
+          workspace_name: string
+          success: boolean
+          message: string
+        }[]
       }
     }
     Enums: {

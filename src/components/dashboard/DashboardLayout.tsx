@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageProvider, useMessages } from '@/contexts/MessageContext';
+import { useChannels } from '@/hooks/useChannels';
 import NavigationSidebar from './NavigationSidebar';
 import Sidebar from './Sidebar';
 import DMSidebar from './DMSidebar';
@@ -13,80 +14,44 @@ import SearchModal from './SearchModal';
 import WorkspaceSettings from './WorkspaceSettings';
 import AIChatbox from './AIChatbox';
 
-// Define the Channel interface
-interface Channel {
-  id: string;
-  name: string;
-  isPrivate: boolean;
-  description?: string;
-  unreadCount?: number;
-  createdAt: string;
-  createdBy?: string;
-}
-
 const DashboardContent: React.FC = () => {
   const { user, workspace, logout } = useAuth();
   const { selectedThread, setSelectedThread } = useMessages();
-  const [selectedChannel, setSelectedChannel] = useState('general');
+  const { channels, loading: channelsLoading, createChannel } = useChannels(workspace?.id);
+  
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showDMSidebar, setShowDMSidebar] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false);
   const [showAIChatbox, setShowAIChatbox] = useState(false);
-  const [favoriteChannel, setFavoriteChannel] = useState('general');
-  
-  // Initialize channels from localStorage or use default channels
-  const [channels, setChannels] = useState<Channel[]>(() => {
-    try {
-      // Get channels from localStorage based on workspace ID
-      const workspaceId = workspace?.id || 'default';
-      const savedChannels = localStorage.getItem(`channels_${workspaceId}`);
-      if (savedChannels) {
-        return JSON.parse(savedChannels);
-      }
-    } catch (error) {
-      console.error('Error loading channels from localStorage:', error);
-    }
-    
-    // Default channels if none found in localStorage
-    return [
-      { id: 'general', name: 'general', isPrivate: false, unreadCount: 0, createdAt: new Date().toISOString() },
-      { id: 'random', name: 'random', isPrivate: false, unreadCount: 0, createdAt: new Date().toISOString() }
-    ];
-  });
 
-  const handleCreateChannel = (channelData: { name: string; description: string; isPrivate: boolean }) => {
-    // Create new channel with all necessary properties
-    const newChannel: Channel = {
-      id: channelData.name,
-      name: channelData.name,
-      isPrivate: channelData.isPrivate,
-      description: channelData.description,
-      unreadCount: 0,
-      createdAt: new Date().toISOString(),
-      createdBy: user?.id
-    };
-    
-    // Update channels list
-    const updatedChannels = [...channels, newChannel];
-    setChannels(updatedChannels);
-    
-    // Store updated channels in localStorage
-    try {
-      const workspaceId = workspace?.id || 'default';
-      localStorage.setItem(`channels_${workspaceId}`, JSON.stringify(updatedChannels));
-    } catch (error) {
-      console.error('Error saving channels to localStorage:', error);
+  // Set default channel when channels load
+  useEffect(() => {
+    if (channels.length > 0 && !selectedChannel) {
+      const generalChannel = channels.find(c => c.name === 'general') || channels[0];
+      setSelectedChannel(generalChannel.id);
     }
-    
-    // Select the new channel
-    setSelectedChannel(newChannel.id);
-    setShowCreateChannel(false);
+  }, [channels, selectedChannel]);
+
+  const handleCreateChannel = async (channelData: { name: string; description: string; isPrivate: boolean }) => {
+    try {
+      const newChannel = await createChannel(channelData.name, channelData.description, channelData.isPrivate);
+      if (newChannel) {
+        setSelectedChannel(newChannel.id);
+      }
+      setShowCreateChannel(false);
+    } catch (error) {
+      console.error('Error creating channel:', error);
+    }
   };
 
   const handleHomeClick = () => {
-    setSelectedChannel(favoriteChannel);
+    if (channels.length > 0) {
+      const generalChannel = channels.find(c => c.name === 'general') || channels[0];
+      setSelectedChannel(generalChannel.id);
+    }
     setSelectedThread(null);
     setShowDMSidebar(false);
   };
@@ -103,7 +68,10 @@ const DashboardContent: React.FC = () => {
 
   const handleBackToBrowse = () => {
     setShowDMSidebar(false);
-    setSelectedChannel(favoriteChannel);
+    if (channels.length > 0) {
+      const generalChannel = channels.find(c => c.name === 'general') || channels[0];
+      setSelectedChannel(generalChannel.id);
+    }
   };
 
   const handleSearchClick = () => {
@@ -120,15 +88,24 @@ const DashboardContent: React.FC = () => {
   };
   
   const handleLogout = () => {
-    // Remove workspace selection flag
     localStorage.removeItem('workspace_selected');
-    // Call the logout function from AuthContext
     logout();
   };
 
   const handleAIClick = () => {
     setShowAIChatbox(true);
   };
+
+  // Convert database channels to the format expected by existing components
+  const formattedChannels = channels.map(channel => ({
+    id: channel.id,
+    name: channel.name,
+    isPrivate: channel.is_private,
+    description: channel.description,
+    unreadCount: 0,
+    createdAt: channel.created_at,
+    createdBy: channel.created_by
+  }));
 
   return (
     <div className="flex h-screen bg-chat-dark overflow-hidden">
@@ -153,7 +130,7 @@ const DashboardContent: React.FC = () => {
           user={user}
           workspace={workspace}
           currentChannel={selectedChannel}
-          channels={channels}
+          channels={formattedChannels}
           onChannelSelect={setSelectedChannel}
           onProfileClick={() => setShowUserProfile(true)}
           onCreateChannel={() => setShowCreateChannel(true)}
@@ -171,7 +148,7 @@ const DashboardContent: React.FC = () => {
           <ChatArea 
             channel={selectedChannel}
             user={user}
-            channels={channels}
+            channels={formattedChannels}
           />
         </div>
         
@@ -205,11 +182,10 @@ const DashboardContent: React.FC = () => {
         onClose={() => setShowWorkspaceSettings(false)}
       />
 
-      {/* AI Chatbox */}
       <AIChatbox
         isOpen={showAIChatbox}
         onClose={() => setShowAIChatbox(false)}
-        channelNames={channels.reduce((acc, channel) => {
+        channelNames={formattedChannels.reduce((acc, channel) => {
           acc[channel.id] = channel.name;
           return acc;
         }, {} as { [channelId: string]: string })}
