@@ -42,12 +42,42 @@ export const useWorkspaces = () => {
       console.log('Fetching workspaces for user ID:', userId);
       setLoading(true);
       
-      // Use our dedicated API function to get workspaces
-      const data = await getUserWorkspaces(userId);
-      console.log('Workspaces fetched:', data.length || 0);
-      setWorkspaces(data || []);
+      // Query workspaces where user is a member
+      const { data: memberWorkspaces, error: memberError } = await supabase
+        .from('workspace_members')
+        .select(`
+          workspace_id,
+          role,
+          workspaces (
+            id,
+            name,
+            url,
+            slug,
+            icon,
+            created_by,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('user_id', userId);
+
+      if (memberError) {
+        console.error('Error fetching workspace memberships:', memberError);
+        throw memberError;
+      }
+
+      console.log('Raw workspace memberships:', memberWorkspaces);
+
+      // Extract workspace data from the join
+      const workspaceData = memberWorkspaces
+        ?.map(member => member.workspaces)
+        .filter(Boolean) as DatabaseWorkspace[] || [];
+
+      console.log('Processed workspaces:', workspaceData);
+      setWorkspaces(workspaceData);
     } catch (error) {
       console.error('Error fetching workspaces:', error);
+      setWorkspaces([]);
     } finally {
       setLoading(false);
     }
@@ -79,24 +109,11 @@ export const useWorkspaces = () => {
       const workspace = await apiCreateWorkspace(workspaceData);
       console.log('Workspace created successfully:', workspace);
       
-      // Force a refresh of the workspaces list
-      console.log('Forcing workspace refresh after creation');
-      refreshWorkspaces();
+      // Wait a moment for the trigger to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Also directly fetch to ensure we have the latest data
-      console.log('Also directly fetching workspaces to ensure latest data');
+      // Refresh the workspaces list
       await fetchWorkspaces(userId);
-      
-      // Manually add the new workspace to the state if it's not already there
-      setWorkspaces(currentWorkspaces => {
-        // Check if the workspace is already in the list
-        const exists = currentWorkspaces.some(w => w.id === workspace.id);
-        if (!exists) {
-          console.log('Manually adding new workspace to state');
-          return [...currentWorkspaces, workspace];
-        }
-        return currentWorkspaces;
-      });
       
       return workspace;
     } catch (error) {
@@ -140,6 +157,6 @@ export const useWorkspaces = () => {
     loading,
     createWorkspace,
     joinWorkspace,
-    refetch: fetchWorkspaces
+    refetch: () => fetchWorkspaces(session?.user?.id || '')
   };
 };

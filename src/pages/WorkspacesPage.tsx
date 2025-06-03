@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,10 +53,9 @@ const WorkspacesPage: React.FC = () => {
           description: `Launching ${selectedWorkspace.name} workspace...`,
         });
         
-        // Use direct window location change for more reliable navigation
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 500);
+        // Navigate to dashboard
+        console.log('Navigating to dashboard...');
+        navigate('/dashboard');
       }
     } catch (error) {
       console.error('Error launching workspace:', error);
@@ -97,21 +95,6 @@ const WorkspacesPage: React.FC = () => {
       // Reset form
       setShowCreateWorkspace(false);
       setCreateWorkspaceData({ name: '', description: '', slug: '' });
-      
-      // Force a re-render to show the new workspace
-      // This is a workaround to ensure the UI updates
-      setTimeout(() => {
-        console.log('Forcing re-render to update UI with new workspace');
-        setWorkspaces(currentWorkspaces => {
-          // Check if the workspace is already in the list
-          const exists = currentWorkspaces.some(w => w.id === workspace.id);
-          if (!exists) {
-            console.log('Manually adding new workspace to UI state');
-            return [...currentWorkspaces, workspace];
-          }
-          return [...currentWorkspaces]; // Return a new array to trigger re-render
-        });
-      }, 500);
       
       toast({
         title: "Success",

@@ -402,6 +402,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_workspace_direct: {
+        Args: {
+          workspace_name: string
+          workspace_url: string
+          workspace_slug: string
+          user_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          icon: string | null
+          id: string
+          name: string
+          slug: string | null
+          updated_at: string
+          url: string
+        }[]
+      }
       is_channel_member: {
         Args: { channel_id: string; user_id: string }
         Returns: boolean

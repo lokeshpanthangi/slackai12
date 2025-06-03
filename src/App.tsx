@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { MessageProvider } from "@/contexts/MessageContext";
 import Index from "./pages/Index";
 import WorkspacesPage from "./pages/WorkspacesPage";
+import DashboardLayout from "./components/dashboard/DashboardLayout";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/landing/LandingPage";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,6 +52,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <WorkspacesPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute>
+            <DashboardLayout />
           </ProtectedRoute>
         } 
       />
