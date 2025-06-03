@@ -32,7 +32,7 @@ interface Channel {
 }
 
 interface ChatAreaProps {
-  channel: string;
+  channel: string | null;
   user: User | null;
   channels?: Channel[];
 }
@@ -43,7 +43,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const channelMessages = messages[channel] || [];
+  const channelMessages = channel ? (messages[channel] || []) : [];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,6 +54,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
   }, [channelMessages]);
 
   const getChannelIcon = () => {
+    if (!channel) {
+      return <Hash className="w-5 h-5" />;
+    }
     if (channel.startsWith('dm-')) {
       return <Users className="w-5 h-5" />;
     }
@@ -61,6 +64,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
   };
 
   const getChannelName = () => {
+    if (!channel) {
+      return 'Select a channel';
+    }
+    
     // For direct messages
     if (channel.startsWith('dm-')) {
       const dmNames = {
@@ -116,6 +123,27 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
         message.username.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : channelMessages;
+
+  // Show a placeholder when no channel is selected
+  if (!channel) {
+    return (
+      <div className="flex flex-col h-full w-full bg-chat-dark min-w-0">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <Hash className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">
+              Welcome to your workspace
+            </h3>
+            <p className="text-gray-400">
+              Select a channel from the sidebar to start chatting
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full w-full bg-chat-dark min-w-0">
