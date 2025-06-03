@@ -16,7 +16,7 @@ export interface DatabaseWorkspace {
 
 interface WorkspaceMemberResult {
   workspace_id: string;
-  workspaces: DatabaseWorkspace | null;
+  workspaces: DatabaseWorkspace[];
 }
 
 export const useWorkspaces = () => {
@@ -48,7 +48,7 @@ export const useWorkspaces = () => {
 
       // Extract workspace data from the joined query result
       const workspaceData = (data as WorkspaceMemberResult[])
-        ?.map(item => item.workspaces)
+        ?.flatMap(item => item.workspaces)
         .filter((workspace): workspace is DatabaseWorkspace => workspace !== null) || [];
       
       setWorkspaces(workspaceData);
