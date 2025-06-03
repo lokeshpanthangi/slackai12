@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { downloadMeetingNotes } from '@/utils/meetingNotesGenerator';
 import { User } from '@/contexts/AuthContext';
-import { useMessages } from '@/contexts/MessageContext';
+import { useMessages } from '@/hooks/useMessages';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 
@@ -38,12 +38,11 @@ interface ChatAreaProps {
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => {
-  const { messages } = useMessages();
+  const { messages, loading, sendMessage } = useMessages(channel || undefined);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const channelMessages = channel ? (messages[channel] || []) : [];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,7 +50,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
 
   useEffect(() => {
     scrollToBottom();
-  }, [channelMessages]);
+  }, [messages]);
 
   const getChannelIcon = () => {
     if (!channel) {
@@ -68,16 +67,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
       return 'Select a channel';
     }
     
-    // For direct messages
+    // For direct messages, we'll need to get the user name from the workspace members
     if (channel.startsWith('dm-')) {
-      const dmNames = {
-        'dm-1': 'Sarah Wilson',
-        'dm-2': 'Mike Chen',
-        'dm-3': 'Emma Davis',
-        'dm-4': 'John Smith',
-        'dm-5': 'Lisa Brown'
-      };
-      return dmNames[channel as keyof typeof dmNames] || 'Direct Message';
+      return 'Direct Message'; // This could be enhanced to show actual user name
     }
     
     // For channels, look up the name in the channels array
@@ -87,27 +79,26 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
 
   const shouldShowAvatar = (messageIndex: number) => {
     if (messageIndex === 0) return true;
-    const currentMessage = channelMessages[messageIndex];
-    const previousMessage = channelMessages[messageIndex - 1];
+    const currentMessage = messages[messageIndex];
+    const previousMessage = messages[messageIndex - 1];
     
     // Show avatar if different user or time gap > 5 minutes
-    const timeDiff = currentMessage.timestamp.getTime() - previousMessage.timestamp.getTime();
-    return currentMessage.userId !== previousMessage.userId || timeDiff > 5 * 60 * 1000;
+    const timeDiff = new Date(currentMessage.created_at).getTime() - new Date(previousMessage.created_at).getTime();
+    return currentMessage.user_id !== previousMessage.user_id || timeDiff > 5 * 60 * 1000;
   };
 
   const isGroupedMessage = (messageIndex: number) => {
     if (messageIndex === 0) return false;
-    const currentMessage = channelMessages[messageIndex];
-    const previousMessage = channelMessages[messageIndex - 1];
+    const currentMessage = messages[messageIndex];
+    const previousMessage = messages[messageIndex - 1];
     
     // Group if same user and within 5 minutes
-    const timeDiff = currentMessage.timestamp.getTime() - previousMessage.timestamp.getTime();
-    return currentMessage.userId === previousMessage.userId && timeDiff <= 5 * 60 * 1000;
+    const timeDiff = new Date(currentMessage.created_at).getTime() - new Date(previousMessage.created_at).getTime();
+    return currentMessage.user_id === previousMessage.user_id && timeDiff <= 5 * 60 * 1000;
   };
 
   const handleStarClick = () => {
     setIsFavorite(!isFavorite);
-    // Here you would typically save this to a favorites list
   };
 
   const handleSearchClick = () => {
@@ -118,11 +109,29 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
   };
 
   const filteredMessages = searchQuery.trim() 
-    ? channelMessages.filter(message => 
+    ? messages.filter(message => 
         message.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        message.username.toLowerCase().includes(searchQuery.toLowerCase())
+        (message.profiles?.display_name || '').toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : channelMessages;
+    : messages;
+
+  // Convert database messages to the format expected by MessageBubble
+  const formattedMessages = filteredMessages.map(msg => ({
+    id: msg.id,
+    channelId: msg.channel_id,
+    userId: msg.user_id,
+    username: msg.profiles?.display_name || 'User',
+    avatar: msg.profiles?.avatar,
+    content: msg.content,
+    timestamp: new Date(msg.created_at),
+    edited: !!msg.edited_at,
+    editedAt: msg.edited_at ? new Date(msg.edited_at) : undefined,
+    reactions: [],
+    replies: [],
+    replyCount: 0,
+    threadParticipants: [],
+    isPinned: msg.is_pinned || false
+  }));
 
   // Show a placeholder when no channel is selected
   if (!channel) {
@@ -159,13 +168,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
             </h2>
             {!channel.startsWith('dm-') && (
               <div>
-                {/* Show channel description if available */}
                 {channels.find(c => c.id === channel)?.description && (
                   <p className="text-sm text-gray-300 truncate">
                     {channels.find(c => c.id === channel)?.description}
                   </p>
                 )}
-                {/* Removed members count */}
               </div>
             )}
           </div>
@@ -182,14 +189,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
           >
             <Star className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
           </Button>
-          {/* Removed phone and video call icons */}
           <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-200 hover:bg-gray-700">
             <Info className="w-4 h-4" />
           </Button>
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => downloadMeetingNotes(channelMessages, getChannelName())}
+            onClick={() => downloadMeetingNotes(formattedMessages, getChannelName())}
             className="text-gray-400 hover:text-gray-200 hover:bg-gray-700 flex items-center gap-1"
             title="Generate Meeting Notes"
           >
@@ -243,7 +249,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {filteredMessages.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-8 px-4">
+            <p className="text-gray-400">Loading messages...</p>
+          </div>
+        ) : formattedMessages.length === 0 ? (
           <div className="text-center py-8 px-4">
             <div className="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center mx-auto mb-4">
               <div className="text-gray-400">
@@ -267,7 +277,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
           </div>
         ) : (
           <div className="pb-4">
-            {filteredMessages.map((message, index) => (
+            {formattedMessages.map((message, index) => (
               <MessageBubble
                 key={message.id}
                 message={message}
@@ -286,6 +296,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
           <MessageInput
             channelId={channel}
             placeholder={`Message ${channel.startsWith('dm-') ? getChannelName() : `#${getChannelName()}`}`}
+            onSendMessage={sendMessage}
           />
         </div>
       </div>

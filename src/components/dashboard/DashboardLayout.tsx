@@ -157,7 +157,7 @@ const DashboardContent: React.FC = () => {
         <Sidebar 
           user={user}
           workspace={workspace}
-          currentChannel={selectedChannel}
+          currentChannel={selectedChannel || ''}
           channels={formattedChannels}
           onChannelSelect={setSelectedChannel}
           onProfileClick={() => setShowUserProfile(true)}

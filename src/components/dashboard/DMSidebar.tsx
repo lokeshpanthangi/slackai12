@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -11,13 +11,14 @@ import {
 } from 'lucide-react';
 import { User, Workspace } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/ui/user-avatar';
+import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 
 interface DMSidebarProps {
   user: User | null;
   workspace: Workspace | null;
   onUserSelect: (userId: string) => void;
   onBackClick: () => void;
-  selectedDM: string;
+  selectedDM: string | null;
 }
 
 const DMSidebar: React.FC<DMSidebarProps> = ({
@@ -28,14 +29,7 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
   selectedDM
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Start with completely empty workspace members - no mock data at all
-  const [workspaceMembers, setWorkspaceMembers] = useState<Array<{
-    id: string;
-    name: string;
-    presence: string;
-    avatar: string;
-  }>>([]);
+  const { members, loading } = useWorkspaceMembers(workspace?.id);
 
   const getPresenceColor = (presence: string) => {
     switch (presence) {
@@ -46,9 +40,12 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
     }
   };
 
-  const filteredMembers = workspaceMembers.filter(member =>
-    member.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter out current user and apply search
+  const filteredMembers = members
+    .filter(member => member.user_id !== user?.id)
+    .filter(member =>
+      member.profiles?.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   return (
     <div className="w-64 bg-slack-dark-aubergine text-white flex flex-col">
@@ -95,11 +92,50 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
             Workspace Members ({filteredMembers.length})
           </h3>
           
-          <div className="text-center py-8">
-            <p className="text-white/60 text-13">
-              No workspace members found.
-            </p>
-          </div>
+          {loading ? (
+            <div className="text-center py-4">
+              <p className="text-white/60 text-13">Loading members...</p>
+            </div>
+          ) : filteredMembers.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-white/60 text-13">
+                {searchQuery ? 'No members found.' : 'No other members in workspace.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filteredMembers.map((member) => {
+                const isSelected = selectedDM === `dm-${member.user_id}`;
+                return (
+                  <Button
+                    key={member.id}
+                    variant="ghost"
+                    onClick={() => onUserSelect(`dm-${member.user_id}`)}
+                    className={`w-full justify-start text-white hover:bg-white/10 h-10 text-13 px-2 ${
+                      isSelected ? 'bg-white/20' : ''
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3 w-full">
+                      <div className="relative">
+                        <UserAvatar 
+                          name={member.profiles?.display_name || 'User'} 
+                          size="sm"
+                          className="w-6 h-6"
+                        />
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${getPresenceColor(member.profiles?.presence || 'offline')}`} />
+                      </div>
+                      <span className="flex-1 text-left truncate">
+                        {member.profiles?.display_name || 'User'}
+                      </span>
+                      {member.role === 'admin' && (
+                        <span className="text-xs text-white/60">Admin</span>
+                      )}
+                    </div>
+                  </Button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
