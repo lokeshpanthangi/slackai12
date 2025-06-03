@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,7 +17,7 @@ export interface DatabaseWorkspace {
 interface WorkspaceMemberRow {
   workspace_id: string;
   role: string;
-  workspaces: DatabaseWorkspace;
+  workspaces: DatabaseWorkspace[]; // This is an array, not a single object
 }
 
 export const useWorkspaces = () => {
@@ -103,10 +102,11 @@ export const useWorkspaces = () => {
       // Extract workspace data from the join with proper typing
       const workspaceData: DatabaseWorkspace[] = (memberWorkspaces as WorkspaceMemberRow[])
         ?.map(member => {
-          const workspace = member.workspaces;
+          // Since workspaces is an array, we need to get the first element
+          const workspace = Array.isArray(member.workspaces) ? member.workspaces[0] : member.workspaces;
           
           // Ensure workspace exists and has the required properties
-          if (workspace && typeof workspace === 'object' && !Array.isArray(workspace)) {
+          if (workspace && typeof workspace === 'object') {
             return {
               id: workspace.id,
               name: workspace.name,
