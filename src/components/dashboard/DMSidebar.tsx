@@ -10,7 +10,6 @@ import {
   Bell
 } from 'lucide-react';
 import { User, Workspace } from '@/contexts/AuthContext';
-import test01Data from '@/data/test01-workspace';
 import { UserAvatar } from '@/components/ui/user-avatar';
 
 interface DMSidebarProps {
@@ -30,7 +29,7 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Use Test01 workspace participants when workspace id is 3
+  // Default workspace members
   const [workspaceMembers, setWorkspaceMembers] = useState([
     { id: 'dm-1', name: 'Sarah Wilson', presence: 'active', avatar: 'SW' },
     { id: 'dm-2', name: 'Mike Chen', presence: 'away', avatar: 'MC' },
@@ -38,14 +37,6 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
     { id: 'dm-4', name: 'John Smith', presence: 'active', avatar: 'JS' },
     { id: 'dm-5', name: 'Lisa Brown', presence: 'dnd', avatar: 'LB' },
   ]);
-  
-  // Update members when workspace changes
-  useEffect(() => {
-    if (workspace?.id === '3') {
-      // Use Test01 workspace participants
-      setWorkspaceMembers(test01Data.participants);
-    }
-  }, [workspace?.id]);
 
   const getPresenceColor = (presence: string) => {
     switch (presence) {

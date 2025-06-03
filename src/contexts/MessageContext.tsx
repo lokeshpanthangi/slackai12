@@ -1,7 +1,5 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { addMockThreadsToChannels } from '@/utils/mockThreadData';
-import { addTeamConversation } from '@/utils/mockTeamConversation';
 
 export interface Document {
   id: string;
@@ -39,9 +37,7 @@ export interface MessageContextType {
   getMessages: (channelId: string) => Message[] | undefined;
   getAllPublicChannelMessages: () => { [channelId: string]: Message[] };
   getThreadReplies: (channelId: string, parentMessageId: string) => Message[];
-  addMockThreads: () => { success: boolean; message: string };
   loadMessagesFromLocalStorage: () => { [channelId: string]: Message[] };
-  addTeamConversationData: () => { success: boolean; message: string };
   selectedThread: { channelId: string; messageId: string } | null;
   setSelectedThread: React.Dispatch<React.SetStateAction<{ channelId: string; messageId: string } | null>>;
   pinMessage: (channelId: string, messageId: string) => void;
@@ -311,51 +307,6 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
     return parentMessage.replies || [];
   };
 
-  // Add mock thread data to channels
-  const addMockThreads = () => {
-    const result = addMockThreadsToChannels();
-    if (result.success) {
-      // Reload messages from localStorage
-      const savedMessages = loadMessagesFromLocalStorage();
-      setMessages(savedMessages);
-    }
-    return result;
-  };
-  
-  // Add mock conversation to team channel in team01 workspace
-  const addTeamConversationData = () => {
-    const result = addTeamConversation();
-    if (result.success) {
-      // Reload messages from localStorage
-      const savedMessages = loadMessagesFromLocalStorage();
-      setMessages(savedMessages);
-    }
-    return result;
-  };
-
-  // Add mock threads when the component mounts if they don't exist
-  useEffect(() => {
-    // Check if general channel has any threads
-    const generalMessages = messages['general'] || [];
-    const hasThreads = generalMessages.some(msg => msg.replyCount > 0);
-    
-    if (!hasThreads && generalMessages.length > 0) {
-      addMockThreads();
-    }
-    
-    // Check if team channel in team01 workspace has any messages
-    const teamChannelKey = 'team01/team';
-    const teamMessages = messages[teamChannelKey] || [];
-    
-    if (teamMessages.length === 0) {
-      // Add mock conversation to team channel
-      addTeamConversation();
-      // Reload messages from localStorage
-      const savedMessages = loadMessagesFromLocalStorage();
-      setMessages(savedMessages);
-    }
-  }, []);
-
   // Pin a message
   const pinMessage = (channelId: string, messageId: string) => {
     setMessages(prev => {
@@ -479,9 +430,7 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
       getMessages,
       getAllPublicChannelMessages,
       getThreadReplies,
-      addMockThreads,
       loadMessagesFromLocalStorage,
-      addTeamConversationData,
       pinMessage,
       unpinMessage,
       getPinnedMessages,

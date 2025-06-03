@@ -19,7 +19,6 @@ import {
 import { User, Workspace } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessageContext';
 import DirectMessageModal from './DirectMessageModal';
-import test01Data from '@/data/test01-workspace';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { UserAvatar } from '@/components/ui/user-avatar';
@@ -64,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showDirectMessageModal, setShowDirectMessageModal] = useState(false);
   const { messages } = useMessages();
 
-  // Use Test01 workspace participants when workspace id is 3
+  // Default direct messages data
   const [directMessages, setDirectMessages] = useState([
     { id: 'dm-1', name: 'Sarah Wilson', presence: 'active', unreadCount: 1 },
     { id: 'dm-2', name: 'Mike Chen', presence: 'away', unreadCount: 0 },
@@ -72,14 +71,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dm-4', name: 'John Smith', presence: 'active', unreadCount: 3 },
     { id: 'dm-5', name: 'Lisa Brown', presence: 'dnd', unreadCount: 0 },
   ]);
-  
-  // Update members when workspace changes
-  useEffect(() => {
-    if (workspace?.id === '3') {
-      // Use Test01 workspace participants
-      setDirectMessages(test01Data.participants);
-    }
-  }, [workspace?.id]);
 
   const getPresenceColor = (presence: string) => {
     switch (presence) {
