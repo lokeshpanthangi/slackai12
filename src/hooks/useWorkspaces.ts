@@ -15,6 +15,22 @@ export interface DatabaseWorkspace {
   slug?: string;
 }
 
+// Type for the joined query response
+interface WorkspaceMemberWithWorkspace {
+  workspace_id: string;
+  role: string;
+  workspaces: {
+    id: string;
+    name: string;
+    url: string;
+    slug?: string;
+    icon?: string;
+    created_by: string;
+    created_at: string;
+    updated_at: string;
+  };
+}
+
 export const useWorkspaces = () => {
   const [workspaces, setWorkspaces] = useState<DatabaseWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,11 +85,11 @@ export const useWorkspaces = () => {
       console.log('Raw workspace memberships:', memberWorkspaces);
 
       // Extract workspace data from the join and properly type it
-      const workspaceData: DatabaseWorkspace[] = memberWorkspaces
+      const workspaceData: DatabaseWorkspace[] = (memberWorkspaces as WorkspaceMemberWithWorkspace[])
         ?.map(member => {
           const workspace = member.workspaces;
           // Ensure workspace exists and has the required properties
-          if (workspace && typeof workspace === 'object' && !Array.isArray(workspace)) {
+          if (workspace && typeof workspace === 'object') {
             return {
               id: workspace.id,
               name: workspace.name,
