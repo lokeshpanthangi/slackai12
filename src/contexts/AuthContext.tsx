@@ -1,5 +1,7 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface User {
   id: string;
@@ -62,23 +64,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const isAuthenticated = !!user && !!workspace;
 
   useEffect(() => {
-    // Simulate checking for existing session
+    // Check for existing session
     const checkSession = async () => {
       setIsLoading(true);
       try {
-        const savedUser = localStorage.getItem('slack_user');
-        const savedWorkspace = localStorage.getItem('slack_workspace');
-        const workspaceSelected = localStorage.getItem('workspace_selected');
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (savedUser && savedWorkspace) {
-          setUser(JSON.parse(savedUser));
+        if (session?.user) {
+          await loadUserProfile(session.user);
+        }
+        
+        // Also check localStorage for workspace selection
+        const savedWorkspace = localStorage.getItem('slack_workspace');
+        if (savedWorkspace) {
           setWorkspaceState(JSON.parse(savedWorkspace));
-          
-          // If workspace was previously selected but flag is missing, set it
-          if (savedWorkspace && !workspaceSelected) {
-            // This ensures we don't lose workspace selection state on refresh
-            localStorage.setItem('workspace_selected', 'true');
-          }
         }
       } catch (error) {
         console.error('Error checking session:', error);
@@ -88,25 +87,70 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        await loadUserProfile(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setWorkspaceState(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string, workspaceUrl?: string) => {
-    setIsLoading(true);
+  const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUser: User = {
-        id: '1',
-        email,
-        displayName: email.split('@')[0],
-        status: { text: '', emoji: '' },
-        presence: 'active',
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      const userData: User = {
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        displayName: profile?.display_name || supabaseUser.email?.split('@')[0] || '',
+        avatar: profile?.avatar,
+        status: {
+          text: profile?.status_text || '',
+          emoji: profile?.status_emoji || ''
+        },
+        presence: profile?.presence || 'offline',
+        timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
         role: 'Member',
         workspaceId: '1'
       };
 
+      setUser(userData);
+      localStorage.setItem('slack_user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
+
+  const login = async (email: string, password: string, workspaceUrl?: string) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        await loadUserProfile(data.user);
+      }
+
+      // Handle workspace logic (mock for now)
       const mockWorkspace: Workspace = {
         id: '1',
         name: workspaceUrl || 'My Workspace',
@@ -114,15 +158,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAdmin: false
       };
 
-      setUser(mockUser);
       setWorkspaceState(mockWorkspace);
-      
-      localStorage.setItem('slack_user', JSON.stringify(mockUser));
       localStorage.setItem('slack_workspace', JSON.stringify(mockWorkspace));
-      
-      // Ensure user is directed to workspaces page after login
       localStorage.removeItem('workspace_selected');
     } catch (error) {
+      console.error('Login error:', error);
       throw new Error('Login failed');
     } finally {
       setIsLoading(false);
@@ -132,20 +172,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signup = async (email: string, password: string, displayName: string, workspaceName?: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUser: User = {
-        id: '1',
+      const { data, error } = await supabase.auth.signUp({
         email,
-        displayName,
-        status: { text: '', emoji: '' },
-        presence: 'active',
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        role: workspaceName ? 'Admin' : 'Member',
-        workspaceId: '1'
-      };
+        password,
+        options: {
+          data: {
+            display_name: displayName
+          }
+        }
+      });
 
+      if (error) throw error;
+
+      if (data.user) {
+        // Create profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email: data.user.email!,
+            display_name: displayName
+          });
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+        }
+
+        await loadUserProfile(data.user);
+      }
+
+      // Handle workspace logic (mock for now)
       const mockWorkspace: Workspace = {
         id: '1',
         name: workspaceName || 'My Workspace',
@@ -153,51 +209,78 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAdmin: !!workspaceName
       };
 
-      setUser(mockUser);
       setWorkspaceState(mockWorkspace);
-      
-      localStorage.setItem('slack_user', JSON.stringify(mockUser));
       localStorage.setItem('slack_workspace', JSON.stringify(mockWorkspace));
     } catch (error) {
+      console.error('Signup error:', error);
       throw new Error('Signup failed');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setWorkspaceState(null);
-    localStorage.removeItem('slack_user');
-    localStorage.removeItem('slack_workspace');
-    localStorage.removeItem('workspace_selected');
-    
-    // Redirect to signin page
-    window.location.href = '/';
-  };
-
-  const updateUserStatus = (status: { text: string; emoji: string; expiration?: Date }) => {
-    if (user) {
-      const updatedUser = { ...user, status };
-      setUser(updatedUser);
-      localStorage.setItem('slack_user', JSON.stringify(updatedUser));
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setWorkspaceState(null);
+      localStorage.removeItem('slack_user');
+      localStorage.removeItem('slack_workspace');
+      localStorage.removeItem('workspace_selected');
+      
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   };
 
-  const updateUserPresence = (presence: 'active' | 'away' | 'offline' | 'dnd') => {
+  const updateUserStatus = async (status: { text: string; emoji: string; expiration?: Date }) => {
     if (user) {
-      const updatedUser = { ...user, presence };
-      setUser(updatedUser);
-      localStorage.setItem('slack_user', JSON.stringify(updatedUser));
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            status_text: status.text,
+            status_emoji: status.emoji,
+            status_expiration: status.expiration?.toISOString()
+          })
+          .eq('id', user.id);
+
+        if (error) throw error;
+
+        const updatedUser = { ...user, status };
+        setUser(updatedUser);
+        localStorage.setItem('slack_user', JSON.stringify(updatedUser));
+      } catch (error) {
+        console.error('Error updating user status:', error);
+      }
+    }
+  };
+
+  const updateUserPresence = async (presence: 'active' | 'away' | 'offline' | 'dnd') => {
+    if (user) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ presence })
+          .eq('id', user.id);
+
+        if (error) throw error;
+
+        const updatedUser = { ...user, presence };
+        setUser(updatedUser);
+        localStorage.setItem('slack_user', JSON.stringify(updatedUser));
+      } catch (error) {
+        console.error('Error updating user presence:', error);
+      }
     }
   };
 
   const switchWorkspace = async (workspaceId: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call to switch workspace
-      await new Promise(resolve => setTimeout(resolve, 500));
       // Implementation would update workspace context
+      await new Promise(resolve => setTimeout(resolve, 500));
     } finally {
       setIsLoading(false);
     }

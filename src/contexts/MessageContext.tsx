@@ -65,8 +65,6 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Initialize messages from localStorage
   const [messages, setMessages] = useState<{ [channelId: string]: Message[] }>(() => {
     try {
-      // Check for messages in localStorage for the current workspace
-      // Try to load messages from Test01 workspace (id: 3)
       const savedMessages = localStorage.getItem('messages_3');
       if (savedMessages) {
         const parsedMessages = JSON.parse(savedMessages);
@@ -97,7 +95,6 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
       const savedDocuments = localStorage.getItem('documents_3');
       if (savedDocuments) {
         const parsedDocuments = JSON.parse(savedDocuments);
-        // Convert string timestamps back to Date objects
         Object.keys(parsedDocuments).forEach(channelId => {
           parsedDocuments[channelId] = parsedDocuments[channelId].map((doc: any) => ({
             ...doc,
@@ -196,66 +193,6 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
-  const addReaction = (channelId: string, messageId: string, emoji: string, userId: string) => {
-    setMessages(prev => {
-      const channelMessages = prev[channelId] || [];
-      const updatedMessages = {
-        ...prev,
-        [channelId]: channelMessages.map(msg => {
-          if (msg.id === messageId) {
-            const existingReaction = msg.reactions.find(r => r.emoji === emoji);
-            if (existingReaction) {
-              if (!existingReaction.users.includes(userId)) {
-                return {
-                  ...msg,
-                  reactions: msg.reactions.map(r => 
-                    r.emoji === emoji 
-                      ? { ...r, users: [...r.users, userId], count: r.count + 1 }
-                      : r
-                  )
-                };
-              }
-            } else {
-              return {
-                ...msg,
-                reactions: [...msg.reactions, { emoji, users: [userId], count: 1 }]
-              };
-            }
-          }
-          return msg;
-        })
-      };
-      saveMessagesToLocalStorage(updatedMessages);
-      return updatedMessages;
-    });
-  };
-
-  const removeReaction = (channelId: string, messageId: string, emoji: string, userId: string) => {
-    setMessages(prev => {
-      const channelMessages = prev[channelId] || [];
-      const updatedMessages = {
-        ...prev,
-        [channelId]: channelMessages.map(msg => {
-          if (msg.id === messageId) {
-            return {
-              ...msg,
-              reactions: msg.reactions.map(r => {
-                if (r.emoji === emoji && r.users.includes(userId)) {
-                  const newUsers = r.users.filter(u => u !== userId);
-                  return { ...r, users: newUsers, count: r.count - 1 };
-                }
-                return r;
-              }).filter(r => r.count > 0)
-            };
-          }
-          return msg;
-        })
-      };
-      saveMessagesToLocalStorage(updatedMessages);
-      return updatedMessages;
-    });
-  };
-
   // Get messages for a specific channel
   const getMessages = (channelId: string): Message[] | undefined => {
     return messages[channelId];
@@ -263,30 +200,22 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Get all messages from all public channels
   const getAllPublicChannelMessages = () => {
-    // Create an object to hold messages by channel ID
     const channelMessages: { [channelId: string]: Message[] } = {};
     
-    // Get all workspace channels
     const workspaceChannels = Object.keys(messages).filter(key => {
-      // Check if the key contains a slash (workspace/channel format)
       if (key.includes('/')) {
-        // Filter to include only public channels (those that don't start with '@')
         const [workspace, channel] = key.split('/');
         return channel && !channel.startsWith('@');
       }
-      // Include regular channels (those without workspace prefix)
       return !key.startsWith('@');
     });
     
-    // Get messages from each channel and organize them by channelId
     workspaceChannels.forEach(channelKey => {
       if (messages[channelKey] && Array.isArray(messages[channelKey])) {
-        // Filter out any messages with invalid structure
         const validMessages = messages[channelKey].filter(msg => 
           msg && typeof msg === 'object' && msg.id && msg.channelId
         );
         
-        // Add valid messages to the channelMessages object
         if (validMessages.length > 0) {
           channelMessages[channelKey] = validMessages;
         }
@@ -415,7 +344,6 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Check if a channel is private
   const isPrivateChannel = (channelId: string): boolean => {
-    // Private channels start with '@' or have 'private' in their name
     return channelId.startsWith('@') || channelId.includes('private');
   };
 

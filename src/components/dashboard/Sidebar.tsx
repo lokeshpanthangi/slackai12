@@ -24,7 +24,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { UserAvatar } from '@/components/ui/user-avatar';
 
-// Define the Channel interface if not already defined elsewhere
 interface Channel {
   id: string;
   name: string;
@@ -64,7 +63,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showDirectMessageModal, setShowDirectMessageModal] = useState(false);
   const { messages } = useMessages();
 
-  // Remove all mock data - start with empty direct messages
   const [directMessages, setDirectMessages] = useState([]);
 
   const getPresenceColor = (presence: string) => {
@@ -76,9 +74,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // We don't need the unread count anymore
   const getUnreadCount = (channelId: string) => {
-    return 0; // Return 0 to hide all unread counts
+    return 0;
   };
 
   const filteredChannels = channels.filter(channel =>
@@ -233,7 +230,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                               </motion.div>
                               <span className="truncate">{channel.name}</span>
                             </div>
-                            {/* Removed unread count numbers */}
                           </div>
                         </Button>
                       </motion.div>
@@ -345,7 +341,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 </motion.div>
                                 <span className="truncate">{dm.name}</span>
                               </div>
-                              {/* Removed unread count numbers */}
                             </div>
                           </Button>
                         </motion.div>
@@ -451,7 +446,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   {user?.status?.emoji || '✨'} {user?.status?.text || 'Active'}
                 </div>
               </div>
-              {/* Removed More button */}
             </div>
           </Button>
         </motion.div>
@@ -468,23 +462,3 @@ const Sidebar: React.FC<SidebarProps> = ({
 };
 
 export default Sidebar;
-
-// Add this to your global CSS file or component styles
-/*
-.sidebar-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sidebar-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-*/
