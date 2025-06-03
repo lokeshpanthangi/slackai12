@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { MessageProvider, useMessages } from '@/contexts/MessageContext';
 import { useChannels } from '@/hooks/useChannels';
 import NavigationSidebar from './NavigationSidebar';
@@ -15,6 +17,7 @@ import AIChatbox from './AIChatbox';
 
 const DashboardContent: React.FC = () => {
   const { user, workspace, logout } = useAuth();
+  const navigate = useNavigate();
   const { selectedThread, setSelectedThread } = useMessages();
   const { channels, loading: channelsLoading, createChannel } = useChannels(workspace?.id);
   
@@ -26,6 +29,16 @@ const DashboardContent: React.FC = () => {
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false);
   const [showAIChatbox, setShowAIChatbox] = useState(false);
 
+  // Check if workspace is selected, if not redirect to workspaces page
+  useEffect(() => {
+    if (!workspace) {
+      console.log('No workspace selected, redirecting to workspaces page');
+      navigate('/workspaces', { replace: true });
+      return;
+    }
+    console.log('Current workspace:', workspace);
+  }, [workspace, navigate]);
+
   // Set default channel when channels load
   useEffect(() => {
     if (channels.length > 0 && !selectedChannel) {
@@ -33,6 +46,22 @@ const DashboardContent: React.FC = () => {
       setSelectedChannel(generalChannel.id);
     }
   }, [channels, selectedChannel]);
+
+  // Show loading state while workspace or channels are loading
+  if (!workspace || channelsLoading) {
+    return (
+      <div className="min-h-screen bg-chat-dark flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-slack-aubergine rounded-slack-xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-white">
+            {!workspace ? 'Loading workspace...' : 'Loading channels...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const handleCreateChannel = async (channelData: { name: string; description: string; isPrivate: boolean }) => {
     try {

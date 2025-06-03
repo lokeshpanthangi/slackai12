@@ -24,7 +24,7 @@ const WorkspacesPage: React.FC = () => {
   });
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  const [isLaunching, setIsLaunching] = useState(false);
+  const [launchingWorkspaceId, setLaunchingWorkspaceId] = useState<string | null>(null);
 
   const handleRefresh = () => {
     console.log('Manual refresh triggered');
@@ -37,7 +37,7 @@ const WorkspacesPage: React.FC = () => {
 
   const handleLaunchWorkspace = async (workspaceId: string) => {
     try {
-      setIsLaunching(true);
+      setLaunchingWorkspaceId(workspaceId);
       console.log('Launching workspace:', workspaceId);
       
       const selectedWorkspace = workspaces.find(ws => ws.id === workspaceId);
@@ -55,7 +55,7 @@ const WorkspacesPage: React.FC = () => {
       
       console.log('Setting workspace in auth context:', workspaceData);
       
-      // Set workspace in context first
+      // Set workspace in context and wait for it to be set
       setWorkspace(workspaceData);
       
       // Store in localStorage for persistence
@@ -70,8 +70,8 @@ const WorkspacesPage: React.FC = () => {
         description: `Launching ${selectedWorkspace.name} workspace...`,
       });
       
-      // Small delay to ensure state is set before navigation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait a bit longer to ensure state is properly set
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       console.log('Navigating to dashboard...');
       navigate('/dashboard', { replace: true });
@@ -84,7 +84,7 @@ const WorkspacesPage: React.FC = () => {
         variant: 'destructive'
       });
     } finally {
-      setIsLaunching(false);
+      setLaunchingWorkspaceId(null);
     }
   };
 
@@ -274,9 +274,9 @@ const WorkspacesPage: React.FC = () => {
                     <Button
                       onClick={() => handleLaunchWorkspace(workspace.id)}
                       className="bg-slack-aubergine hover:bg-slack-aubergine/90 text-white"
-                      disabled={isLaunching}
+                      disabled={launchingWorkspaceId === workspace.id}
                     >
-                      {isLaunching ? 'Launching...' : 'LAUNCH SLACK'}
+                      {launchingWorkspaceId === workspace.id ? 'Launching...' : 'LAUNCH SLACK'}
                     </Button>
                   </div>
                 ))}
