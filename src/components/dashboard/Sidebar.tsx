@@ -63,7 +63,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showDirectMessageModal, setShowDirectMessageModal] = useState(false);
   const { messages } = useMessages();
-  const { members } = useWorkspaceMembers(workspace?.id);
+  const { members, loading } = useWorkspaceMembers(workspace?.id);
+
+  console.log('Sidebar - workspace:', workspace);
+  console.log('Sidebar - members:', members);
+  console.log('Sidebar - loading:', loading);
 
   const getPresenceColor = (presence: string) => {
     switch (presence) {
@@ -94,6 +98,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       presence: member.profiles?.presence || 'offline',
       role: member.role
     }));
+
+  console.log('Sidebar - directMessages:', directMessages);
 
   const handleDirectMessageSelect = (userId: string) => {
     onChannelSelect(userId);
@@ -309,9 +315,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className="overflow-hidden"
               >
                 <div className="space-y-1 pt-1">
-                  {directMessages.length === 0 ? (
+                  {loading ? (
                     <div className="text-center py-4">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <p className="text-white/60 text-sm">Loading members...</p>
+                    </div>
+                  ) : directMessages.length === 0 ? (
+                    <div className="text-center py-4">
+                      <Users className="w-6 h-6 mx-auto mb-2 text-white/30" />
                       <p className="text-white/60 text-sm">No team members found</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onInviteTeammates}
+                        className="text-purple-400 hover:text-purple-300 text-xs mt-1 h-auto p-1"
+                      >
+                        Invite teammates
+                      </Button>
                     </div>
                   ) : (
                     directMessages.map((dm) => {

@@ -1,25 +1,14 @@
+
 import React, { useState, useEffect, useRef } from 'react';
+import { Hash, Users, Pin, Search, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Hash, 
-  Users, 
-  Star, 
-  Phone, 
-  Video, 
-  Info, 
-  Search,
-  X,
-  Notebook,
-  FileDown
-} from 'lucide-react';
-import { downloadMeetingNotes } from '@/utils/meetingNotesGenerator';
-import { User } from '@/contexts/AuthContext';
-import { useMessages } from '@/hooks/useMessages';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
+import { useMessages } from '@/hooks/useMessages';
+import { useMessages as useMessageContext } from '@/contexts/MessageContext';
+import { User } from '@/contexts/AuthContext';
 
-// Define the Channel interface if not already defined elsewhere
 interface Channel {
   id: string;
   name: string;
@@ -33,15 +22,16 @@ interface Channel {
 interface ChatAreaProps {
   channel: string | null;
   user: User | null;
-  channels?: Channel[];
+  channels: Channel[];
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => {
-  const { messages, loading, sendMessage } = useMessages(channel || undefined);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { messages, loading, sendMessage } = useMessages(channel || undefined);
+  const { setSelectedThread } = useMessageContext();
+  
+  const currentChannel = channels.find(c => c.id === channel);
+  const isDM = channel?.startsWith('dm-');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,253 +41,148 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
     scrollToBottom();
   }, [messages]);
 
-  const getChannelIcon = () => {
-    if (!channel) {
-      return <Hash className="w-5 h-5" />;
-    }
-    if (channel.startsWith('dm-')) {
-      return <Users className="w-5 h-5" />;
-    }
-    return <Hash className="w-5 h-5" />;
-  };
-
-  const getChannelName = () => {
-    if (!channel) {
-      return 'Select a channel';
-    }
+  const handleSendMessage = async (content: string) => {
+    if (!channel || !user?.id) return;
     
-    // For direct messages, we'll need to get the user name from the workspace members
-    if (channel.startsWith('dm-')) {
-      return 'Direct Message'; // This could be enhanced to show actual user name
-    }
-    
-    // For channels, look up the name in the channels array
-    const foundChannel = channels.find(c => c.id === channel);
-    return foundChannel ? foundChannel.name : channel;
-  };
-
-  const shouldShowAvatar = (messageIndex: number) => {
-    if (messageIndex === 0) return true;
-    const currentMessage = messages[messageIndex];
-    const previousMessage = messages[messageIndex - 1];
-    
-    // Show avatar if different user or time gap > 5 minutes
-    const timeDiff = new Date(currentMessage.created_at).getTime() - new Date(previousMessage.created_at).getTime();
-    return currentMessage.user_id !== previousMessage.user_id || timeDiff > 5 * 60 * 1000;
-  };
-
-  const isGroupedMessage = (messageIndex: number) => {
-    if (messageIndex === 0) return false;
-    const currentMessage = messages[messageIndex];
-    const previousMessage = messages[messageIndex - 1];
-    
-    // Group if same user and within 5 minutes
-    const timeDiff = new Date(currentMessage.created_at).getTime() - new Date(previousMessage.created_at).getTime();
-    return currentMessage.user_id === previousMessage.user_id && timeDiff <= 5 * 60 * 1000;
-  };
-
-  const handleStarClick = () => {
-    setIsFavorite(!isFavorite);
-  };
-
-  const handleSearchClick = () => {
-    setShowSearch(!showSearch);
-    if (!showSearch) {
-      setSearchQuery('');
+    try {
+      await sendMessage(content);
+    } catch (error) {
+      console.error('Error sending message:', error);
     }
   };
 
-  const filteredMessages = searchQuery.trim() 
-    ? messages.filter(message => 
-        message.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (message.profiles?.display_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : messages;
+  const handleThreadClick = (messageId: string) => {
+    if (channel) {
+      setSelectedThread({
+        channelId: channel,
+        messageId: messageId
+      });
+    }
+  };
 
-  // Convert database messages to the format expected by MessageBubble
-  const formattedMessages = filteredMessages.map(msg => ({
-    id: msg.id,
-    channelId: msg.channel_id,
-    userId: msg.user_id,
-    username: msg.profiles?.display_name || 'User',
-    avatar: msg.profiles?.avatar,
-    content: msg.content,
-    timestamp: new Date(msg.created_at),
-    edited: !!msg.edited_at,
-    editedAt: msg.edited_at ? new Date(msg.edited_at) : undefined,
-    reactions: [],
-    replies: [],
-    replyCount: 0,
-    threadParticipants: [],
-    isPinned: msg.is_pinned || false
-  }));
-
-  // Show a placeholder when no channel is selected
   if (!channel) {
     return (
-      <div className="flex flex-col h-full w-full bg-chat-dark min-w-0">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <Hash className="w-8 h-8 text-gray-400" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              Welcome to your workspace
-            </h3>
-            <p className="text-gray-400">
-              Select a channel from the sidebar to start chatting
-            </p>
-          </div>
+      <div className="flex-1 flex items-center justify-center bg-chat-dark text-white">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Welcome to your workspace!</h2>
+          <p className="text-gray-400">Select a channel to start messaging.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-chat-dark text-white">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p>Loading messages...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-chat-dark min-w-0">
-      {/* Chat Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-chat-dark flex-shrink-0">
-        <div className="flex items-center space-x-3 min-w-0">
-          <div className="text-gray-300 flex-shrink-0">
-            {getChannelIcon()}
-          </div>
-          <div className="min-w-0">
-            <h2 className="font-bold text-lg text-white truncate">
-              {getChannelName()}
-            </h2>
-            {!channel.startsWith('dm-') && (
+    <div className="flex-1 flex flex-col bg-chat-dark">
+      {/* Header */}
+      <div className="h-16 bg-chat-dark border-b border-gray-700 flex items-center justify-between px-6">
+        <div className="flex items-center">
+          {isDM ? (
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center mr-3">
+                <span className="text-white font-medium text-sm">
+                  {channel.replace('dm-', '').charAt(0).toUpperCase()}
+                </span>
+              </div>
               <div>
-                {channels.find(c => c.id === channel)?.description && (
-                  <p className="text-sm text-gray-300 truncate">
-                    {channels.find(c => c.id === channel)?.description}
-                  </p>
+                <h1 className="text-white font-semibold text-lg">
+                  {channel.replace('dm-', '')}
+                </h1>
+                <p className="text-green-400 text-sm">● Active</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center">
+              {currentChannel?.isPrivate ? (
+                <div className="w-8 h-8 bg-gray-600 rounded-md flex items-center justify-center mr-3">
+                  <Users className="w-4 h-4 text-white" />
+                </div>
+              ) : (
+                <Hash className="w-6 h-6 text-gray-400 mr-3" />
+              )}
+              <div>
+                <h1 className="text-white font-semibold text-lg">
+                  {currentChannel?.name || channel}
+                </h1>
+                {currentChannel?.description && (
+                  <p className="text-gray-400 text-sm">{currentChannel.description}</p>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         
-        <div className="flex items-center space-x-2 flex-shrink-0">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleStarClick}
-            className={`hover:text-gray-200 hover:bg-gray-700 ${
-              isFavorite ? 'text-yellow-400' : 'text-gray-400'
-            }`}
-          >
-            <Star className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-200 hover:bg-gray-700">
-            <Info className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => downloadMeetingNotes(formattedMessages, getChannelName())}
-            className="text-gray-400 hover:text-gray-200 hover:bg-gray-700 flex items-center gap-1"
-            title="Generate Meeting Notes"
-          >
-            <Notebook className="w-4 h-4" />
-            <span className="text-xs">AI Notes</span>
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleSearchClick}
-            className={`hover:text-gray-200 hover:bg-gray-700 ${
-              showSearch ? 'text-white bg-gray-700' : 'text-gray-400'
-            }`}
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-white hover:bg-gray-700"
           >
             <Search className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-white hover:bg-gray-700"
+          >
+            <Pin className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-white hover:bg-gray-700"
+          >
+            <MoreVertical className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      {/* Search Bar (if active) */}
-      {showSearch && (
-        <div className="p-4 border-b border-gray-700 bg-chat-dark">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder={`Search in ${getChannelName()}...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-400 hover:text-white"
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            )}
-          </div>
-          {searchQuery && (
-            <p className="text-xs text-gray-400 mt-2">
-              {filteredMessages.length} result{filteredMessages.length !== 1 ? 's' : ''} found
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {loading ? (
-          <div className="text-center py-8 px-4">
-            <p className="text-gray-400">Loading messages...</p>
-          </div>
-        ) : formattedMessages.length === 0 ? (
-          <div className="text-center py-8 px-4">
-            <div className="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <div className="text-gray-400">
-                {searchQuery ? <Search className="w-6 h-6" /> : getChannelIcon()}
-              </div>
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              {searchQuery 
-                ? 'No messages found' 
-                : `This is the very beginning of ${getChannelName()}`
-              }
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {messages.length === 0 ? (
+          <div className="text-center text-gray-400 mt-8">
+            <h3 className="text-lg font-medium mb-2">
+              {isDM ? 'Start a conversation' : `Welcome to #${currentChannel?.name || channel}`}
             </h3>
-            <p className="text-gray-400">
-              {searchQuery 
-                ? `No messages match "${searchQuery}" in this channel.`
-                : channel.startsWith('dm-') 
-                  ? 'This is the start of your conversation.'
-                  : 'This channel is for workspace-wide communication and announcements.'
+            <p className="text-sm">
+              {isDM 
+                ? 'Send a direct message to get the conversation started.'
+                : 'This is the beginning of your conversation in this channel.'
               }
             </p>
           </div>
         ) : (
-          <div className="pb-4">
-            {formattedMessages.map((message, index) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                showAvatar={shouldShowAvatar(index)}
-                isGrouped={isGroupedMessage(index)}
-              />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+          messages.map((message) => (
+            <MessageBubble 
+              key={message.id} 
+              message={message} 
+              showAvatar={true}
+              onThreadClick={() => handleThreadClick(message.id)}
+            />
+          ))
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-700 bg-chat-dark flex-shrink-0">
-        <div className="border border-gray-600 rounded-md bg-gray-700 shadow-inner">
+      <div className="p-4 border-t border-gray-700">
+        <div className="bg-gray-800 rounded-lg border border-gray-600">
           <MessageInput
             channelId={channel}
-            placeholder={`Message ${channel.startsWith('dm-') ? getChannelName() : `#${getChannelName()}`}`}
-            onSendMessage={sendMessage}
-            channelMessages={formattedMessages}
-            channelName={getChannelName()}
+            placeholder={isDM ? "Message..." : `Message #${currentChannel?.name || channel}`}
+            onSendMessage={handleSendMessage}
+            channelMessages={messages}
+            channelName={currentChannel?.name || channel}
           />
         </div>
       </div>

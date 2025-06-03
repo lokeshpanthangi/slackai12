@@ -31,6 +31,10 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const { members, loading } = useWorkspaceMembers(workspace?.id);
 
+  console.log('DMSidebar - workspace:', workspace);
+  console.log('DMSidebar - members:', members);
+  console.log('DMSidebar - loading:', loading);
+
   const getPresenceColor = (presence: string) => {
     switch (presence) {
       case 'active': return 'bg-green-500';
@@ -46,6 +50,8 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
     .filter(member =>
       member.profiles?.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+  console.log('DMSidebar - filteredMembers:', filteredMembers);
 
   return (
     <div className="w-64 bg-slack-dark-aubergine text-white flex flex-col">
@@ -94,13 +100,20 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
           
           {loading ? (
             <div className="text-center py-4">
+              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-white/60 text-13">Loading members...</p>
             </div>
           ) : filteredMembers.length === 0 ? (
             <div className="text-center py-4">
+              <Users className="w-8 h-8 mx-auto mb-2 text-white/30" />
               <p className="text-white/60 text-13">
                 {searchQuery ? 'No members found.' : 'No other members in workspace.'}
               </p>
+              {!searchQuery && (
+                <p className="text-white/40 text-xs mt-1">
+                  Invite teammates to start messaging
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-1">

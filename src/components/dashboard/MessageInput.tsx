@@ -11,7 +11,9 @@ import {
   Bold,
   Italic,
   Code,
-  Link2
+  Link2,
+  Image,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ToneImpactMeter from './ToneImpactMeter';
@@ -42,8 +44,18 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [toneData, setToneData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showFormatting, setShowFormatting] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Emoji categories
+  const emojiCategories = {
+    'Smileys': ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘'],
+    'Gestures': ['👍', '👎', '👌', '🤌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '👋', '🤚'],
+    'Hearts': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💔', '💕', '💞', '💓', '💗', '💖', '💘'],
+    'Objects': ['📱', '💻', '⌨️', '🖥️', '📷', '📸', '📹', '🎥', '📺', '📻', '🎵', '🎶', '🎤', '🎧']
+  };
 
   useEffect(() => {
     const analyzeMessageTone = async () => {
@@ -79,6 +91,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       await onSendMessage(message.trim(), threadParentId);
       setMessage('');
       setToneData(null);
+      setSelectedFiles([]);
       
       // Reset textarea height
       if (textareaRef.current) {
@@ -147,6 +160,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
     }, 0);
   };
 
+  const insertEmoji = (emoji: string) => {
+    setMessage(message + emoji);
+    setShowEmojiPicker(false);
+  };
+
   const handleFileSelect = () => {
     fileInputRef.current?.click();
   };
@@ -154,8 +172,13 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && onFileUpload) {
+      setSelectedFiles(Array.from(files));
       onFileUpload(files);
     }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   if (!user) {
@@ -178,66 +201,112 @@ const MessageInput: React.FC<MessageInputProps> = ({
           />
         </div>
       )}
+
+      {/* File Previews */}
+      {selectedFiles.length > 0 && (
+        <div className="mb-2 p-3 bg-gray-800 rounded-md border border-gray-700">
+          <div className="flex flex-wrap gap-2">
+            {selectedFiles.map((file, index) => (
+              <div key={index} className="flex items-center bg-gray-700 rounded-md px-2 py-1 text-sm text-white">
+                <div className="flex items-center">
+                  <Image className="w-4 h-4 mr-1 text-blue-400" />
+                  <span className="truncate max-w-[150px]">{file.name}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeFile(index)}
+                  className="h-5 w-5 p-0 ml-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded-full"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Emoji Picker */}
+      {showEmojiPicker && (
+        <div className="absolute bottom-full right-0 mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-3 z-50 w-80 max-h-64 overflow-hidden">
+          <div className="max-h-64 overflow-y-auto scrollbar-hide">
+            {Object.entries(emojiCategories).map(([category, emojis]) => (
+              <div key={category} className="mb-3">
+                <div className="text-gray-400 text-xs uppercase mb-1">{category}</div>
+                <div className="grid grid-cols-8 gap-1">
+                  {emojis.map((emoji, index) => (
+                    <button
+                      key={`${category}-${index}`}
+                      onClick={() => insertEmoji(emoji)}
+                      className="w-8 h-8 flex items-center justify-center hover:bg-gray-700 rounded text-lg"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       <form onSubmit={handleSubmit} className="relative">
-        <div className="flex items-end space-x-2 p-3">
-          {/* Formatting Toolbar */}
-          <div className="flex items-center space-x-1 mb-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowFormatting(!showFormatting)}
-              className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
-            >
-              <Bold className="w-3 h-3" />
-            </Button>
-            
-            {showFormatting && (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('bold')}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
-                  title="Bold"
-                >
-                  <Bold className="w-3 h-3" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('italic')}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
-                  title="Italic"
-                >
-                  <Italic className="w-3 h-3" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('code')}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
-                  title="Code"
-                >
-                  <Code className="w-3 h-3" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('link')}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
-                  title="Link"
-                >
-                  <Link2 className="w-3 h-3" />
-                </Button>
-              </>
-            )}
-          </div>
+        {/* Formatting Toolbar */}
+        <div className="flex items-center space-x-1 p-3 border-b border-gray-700">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowFormatting(!showFormatting)}
+            className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
+          >
+            <Bold className="w-3 h-3" />
+          </Button>
+          
+          {showFormatting && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => insertFormatting('bold')}
+                className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
+                title="Bold"
+              >
+                <Bold className="w-3 h-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => insertFormatting('italic')}
+                className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
+                title="Italic"
+              >
+                <Italic className="w-3 h-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => insertFormatting('code')}
+                className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
+                title="Code"
+              >
+                <Code className="w-3 h-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => insertFormatting('link')}
+                className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-600"
+                title="Link"
+              >
+                <Link2 className="w-3 h-3" />
+              </Button>
+            </>
+          )}
         </div>
         
         <div className="flex items-end space-x-2 px-3 pb-3">
@@ -265,11 +334,33 @@ const MessageInput: React.FC<MessageInputProps> = ({
             />
           </div>
           
+          {/* Action Buttons */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-gray-600 flex-shrink-0"
+            title="@mention"
+          >
+            <AtSign className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-gray-600 flex-shrink-0"
+            title="#channel"
+          >
+            <Hash className="w-4 h-4" />
+          </Button>
+          
           {/* Emoji Picker */}
           <Button
             type="button"
             variant="ghost"
             size="sm"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-gray-600 flex-shrink-0"
           >
             <Smile className="w-4 h-4" />

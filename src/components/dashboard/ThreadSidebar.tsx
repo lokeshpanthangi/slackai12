@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Hash, Reply, MoreHorizontal, Notebook } from 'lucide-react';
+import { X, Hash, Reply, MoreHorizontal, Notebook, Sparkles } from 'lucide-react';
 import { useMessages } from '@/contexts/MessageContext';
 import MessageBubble from './MessageBubble';
 import ThreadMessageInput from './ThreadMessageInput';
@@ -42,11 +42,13 @@ const ThreadSidebar: React.FC = () => {
       <div className="p-4 border-b border-gray-700 flex items-center justify-between">
         <div className="flex items-center">
           <div className="text-white font-medium flex items-center">
+            <Hash className="w-4 h-4 mr-1" />
             <span>{selectedThread.channelId}</span>
           </div>
           <div className="mx-2 text-gray-500">&gt;</div>
           <div className="text-white font-medium flex items-center">
-            <span>{parentMessage.username}</span>
+            <Reply className="w-4 h-4 mr-1" />
+            <span>Thread</span>
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -83,6 +85,14 @@ const ThreadSidebar: React.FC = () => {
             <MessageBubble message={parentMessage} showAvatar={true} isInThread={true} />
           </div>
           
+          {/* Thread Info */}
+          <div className="px-4 py-2 border-b border-gray-700">
+            <div className="flex items-center text-sm text-gray-400">
+              <Reply className="w-4 h-4 mr-1" />
+              <span>{parentMessage.replies?.length || 0} replies</span>
+            </div>
+          </div>
+          
           {/* Replies */}
           <div className="p-4 bg-chat-dark w-full">
             <div className="space-y-3 w-full">
@@ -96,6 +106,14 @@ const ThreadSidebar: React.FC = () => {
                   />
                 </div>
               ))}
+              
+              {(!parentMessage.replies || parentMessage.replies.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <Reply className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No replies yet</p>
+                  <p className="text-xs mt-1">Start the conversation below</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

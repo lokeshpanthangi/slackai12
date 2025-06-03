@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 
 interface NavigationSidebarProps {
   onHomeClick: () => void;
@@ -35,12 +36,11 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   const [activeItem, setActiveItem] = useState('home');
   const [animating, setAnimating] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { workspace } = useAuth();
+  const { workspace, user } = useAuth();
+  const { members } = useWorkspaceMembers(workspace?.id);
   
   // Get available workspaces from localStorage
   const [workspaces, setWorkspaces] = useState<any[]>([]);
-  
-  const { user } = useAuth();
   
   useEffect(() => {
     try {
@@ -64,6 +64,9 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       console.error('Error loading workspaces:', error);
     }
   }, [user]);
+
+  // Count DMs (workspace members excluding current user)
+  const dmCount = members.filter(member => member.user_id !== user?.id).length;
   
   const handleItemClick = (item: string, callback: () => void) => {
     setAnimating(item);
@@ -109,7 +112,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
         </Button>
       </div>
       
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center relative">
         <Button
           variant="ghost"
           size="sm"
@@ -121,6 +124,12 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
             <span className="text-xs mt-1 font-light">DMs</span>
           </div>
         </Button>
+        {/* DM Count Badge */}
+        {dmCount > 0 && (
+          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+            {dmCount > 99 ? '99+' : dmCount}
+          </div>
+        )}
       </div>
       
       <div className="flex flex-col items-center">
