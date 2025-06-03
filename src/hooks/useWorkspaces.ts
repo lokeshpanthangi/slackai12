@@ -16,7 +16,7 @@ export interface DatabaseWorkspace {
 
 interface WorkspaceMemberResult {
   workspace_id: string;
-  workspaces: DatabaseWorkspace;
+  workspaces: DatabaseWorkspace; // This should be a single object, not an array
 }
 
 export const useWorkspaces = () => {
@@ -40,7 +40,7 @@ export const useWorkspaces = () => {
         .from('workspace_members')
         .select(`
           workspace_id,
-          workspaces!inner(*)
+          workspaces(*)
         `)
         .eq('user_id', user?.id);
 
