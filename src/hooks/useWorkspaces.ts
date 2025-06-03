@@ -41,7 +41,8 @@ export const useWorkspaces = () => {
 
       if (error) throw error;
 
-      const workspaceData = data?.map(item => item.workspaces).filter(Boolean) || [];
+      // Fix: properly extract workspace data from the joined query result
+      const workspaceData = data?.map(item => item.workspaces as DatabaseWorkspace).filter(Boolean) || [];
       setWorkspaces(workspaceData);
     } catch (error) {
       console.error('Error fetching workspaces:', error);
