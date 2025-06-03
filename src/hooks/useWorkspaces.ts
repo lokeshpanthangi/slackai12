@@ -14,6 +14,11 @@ export interface DatabaseWorkspace {
   slug?: string;
 }
 
+interface WorkspaceMemberResult {
+  workspace_id: string;
+  workspaces: DatabaseWorkspace;
+}
+
 export const useWorkspaces = () => {
   const [workspaces, setWorkspaces] = useState<DatabaseWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +46,8 @@ export const useWorkspaces = () => {
 
       if (error) throw error;
 
-      // Fix: properly extract workspace data from the joined query result
-      const workspaceData = data?.map(item => item.workspaces as DatabaseWorkspace).filter(Boolean) || [];
+      // Fix: properly extract workspace data from the joined query result with correct typing
+      const workspaceData = (data as WorkspaceMemberResult[])?.map(item => item.workspaces).filter(Boolean) || [];
       setWorkspaces(workspaceData);
     } catch (error) {
       console.error('Error fetching workspaces:', error);
