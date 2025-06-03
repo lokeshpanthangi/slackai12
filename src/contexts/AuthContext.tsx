@@ -1,7 +1,19 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+
+export interface User extends SupabaseUser {
+  displayName: string;
+  status: {
+    text: string;
+    emoji: string;
+  };
+  presence: 'active' | 'away' | 'offline' | 'dnd';
+  timezone: string;
+  role: string;
+  avatar?: string;
+}
 
 export interface Workspace {
   id: string;
@@ -21,6 +33,8 @@ interface AuthContextType {
   signup: (email: string, password: string, displayName?: string) => Promise<{ error: any }>;
   logout: () => Promise<void>;
   setWorkspace: (workspace: Workspace | null) => void;
+  updateUserStatus: (status: { text: string; emoji: string }) => void;
+  updateUserPresence: (presence: 'active' | 'away' | 'offline' | 'dnd') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,6 +57,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Transform Supabase user to our User type
+  const transformUser = (supabaseUser: SupabaseUser | null): User | null => {
+    if (!supabaseUser) return null;
+    
+    return {
+      ...supabaseUser,
+      displayName: supabaseUser.user_metadata?.display_name || supabaseUser.email?.split('@')[0] || 'User',
+      status: {
+        text: supabaseUser.user_metadata?.status_text || '',
+        emoji: supabaseUser.user_metadata?.status_emoji || '😀'
+      },
+      presence: supabaseUser.user_metadata?.presence || 'active',
+      timezone: supabaseUser.user_metadata?.timezone || 'UTC',
+      role: supabaseUser.user_metadata?.role || 'member',
+      avatar: supabaseUser.user_metadata?.avatar
+    };
+  };
+
   useEffect(() => {
     console.log('AuthProvider: Setting up auth state listener');
     
@@ -52,7 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('Auth state changed:', { event, hasSession: !!session, hasUser: !!session?.user });
         
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(session?.user ? transformUser(session.user) : null);
         
         // Load workspace from localStorage when user is authenticated
         if (session?.user) {
@@ -85,7 +117,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('Initial session check:', { hasSession: !!session, hasUser: !!session?.user });
       
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(session?.user ? transformUser(session.user) : null);
       
       // Load workspace from localStorage if user is authenticated
       if (session?.user) {
@@ -192,6 +224,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const updateUserStatus = (status: { text: string; emoji: string }) => {
+    console.log('Updating user status:', status);
+    // This would typically update the user's status in the database
+    // For now, just update local state
+    if (user) {
+      setUser({
+        ...user,
+        status
+      });
+    }
+  };
+
+  const updateUserPresence = (presence: 'active' | 'away' | 'offline' | 'dnd') => {
+    console.log('Updating user presence:', presence);
+    // This would typically update the user's presence in the database
+    // For now, just update local state
+    if (user) {
+      setUser({
+        ...user,
+        presence
+      });
+    }
+  };
+
   const handleSetWorkspace = (newWorkspace: Workspace | null) => {
     console.log('Setting workspace:', newWorkspace);
     setWorkspace(newWorkspace);
@@ -217,6 +273,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signup,
     logout,
     setWorkspace: handleSetWorkspace,
+    updateUserStatus,
+    updateUserPresence,
   };
 
   return (
