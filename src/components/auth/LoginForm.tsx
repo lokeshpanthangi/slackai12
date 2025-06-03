@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +34,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
     setIsLoading(true);
 
     try {
-      await login(email, password, workspaceUrl);
+      await login(email, password);
     } catch (err) {
       setError('Invalid email or password. Please try again.');
     } finally {

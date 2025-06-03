@@ -40,12 +40,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({
     setIsLoading(true);
 
     try {
-      await signup(
-        formData.email,
-        formData.password,
-        formData.displayName,
-        isCreatingWorkspace ? formData.workspaceName : undefined
-      );
+      await signup(formData.email, formData.password, formData.displayName);
     } catch (err) {
       setError('Failed to create account. Please try again.');
     } finally {

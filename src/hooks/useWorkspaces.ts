@@ -47,8 +47,8 @@ export const useWorkspaces = () => {
       if (error) throw error;
 
       // Extract workspace data from the joined query result
-      const workspaceData = (data as WorkspaceMemberResult[])
-        ?.map(item => item.workspaces)
+      const workspaceData = data
+        ?.map((item: any) => item.workspaces)
         .filter((workspace): workspace is DatabaseWorkspace => workspace !== null) || [];
       
       setWorkspaces(workspaceData);
