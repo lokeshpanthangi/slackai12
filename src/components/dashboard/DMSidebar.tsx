@@ -29,7 +29,7 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Start with empty workspace members - no default mock data
+  // Start with completely empty workspace members - no mock data at all
   const [workspaceMembers, setWorkspaceMembers] = useState<Array<{
     id: string;
     name: string;
@@ -95,40 +95,11 @@ const DMSidebar: React.FC<DMSidebarProps> = ({
             Workspace Members ({filteredMembers.length})
           </h3>
           
-          {filteredMembers.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-white/60 text-13">
-                No workspace members found.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {filteredMembers.map((member) => (
-                <Button
-                  key={member.id}
-                  variant="ghost"
-                  onClick={() => onUserSelect(member.id)}
-                  className={`w-full justify-start text-white hover:bg-white/10 h-10 text-13 font-normal p-2 ${
-                    selectedDM === member.id ? 'bg-white/20' : ''
-                  }`}
-                >
-                  <div className="flex items-center w-full">
-                    <div className="relative mr-3">
-                      <div className="w-8 h-8 rounded-md overflow-hidden">
-                        <UserAvatar 
-                          name={member.name} 
-                          size="sm" 
-                          className="w-full h-full"
-                        />
-                      </div>
-                      <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${getPresenceColor(member.presence)}`} />
-                    </div>
-                    <span className="truncate">{member.name}</span>
-                  </div>
-                </Button>
-              ))}
-            </div>
-          )}
+          <div className="text-center py-8">
+            <p className="text-white/60 text-13">
+              No workspace members found.
+            </p>
+          </div>
         </div>
       </div>
 
