@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { User, Workspace } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessageContext';
+import { useWorkspaceMembers } from '@/hooks/useWorkspaceMembers';
 import DirectMessageModal from './DirectMessageModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -62,8 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showDirectMessageModal, setShowDirectMessageModal] = useState(false);
   const { messages } = useMessages();
-
-  const [directMessages, setDirectMessages] = useState([]);
+  const { members } = useWorkspaceMembers(workspace?.id);
 
   const getPresenceColor = (presence: string) => {
     switch (presence) {
@@ -82,9 +82,18 @@ const Sidebar: React.FC<SidebarProps> = ({
     channel.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredDirectMessages = directMessages.filter(dm =>
-    dm.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter workspace members for direct messages (exclude current user)
+  const directMessages = members
+    .filter(member => member.user_id !== user?.id)
+    .filter(member =>
+      member.profiles?.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .map(member => ({
+      id: `dm-${member.user_id}`,
+      name: member.profiles?.display_name || 'User',
+      presence: member.profiles?.presence || 'offline',
+      role: member.role
+    }));
 
   const handleDirectMessageSelect = (userId: string) => {
     onChannelSelect(userId);
@@ -300,12 +309,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className="overflow-hidden"
               >
                 <div className="space-y-1 pt-1">
-                  {filteredDirectMessages.length === 0 ? (
+                  {directMessages.length === 0 ? (
                     <div className="text-center py-4">
-                      <p className="text-white/60 text-sm">No direct messages yet</p>
+                      <p className="text-white/60 text-sm">No team members found</p>
                     </div>
                   ) : (
-                    filteredDirectMessages.map((dm) => {
+                    directMessages.map((dm) => {
                       const isActive = currentChannel === dm.id;
                       return (
                         <motion.div
@@ -315,7 +324,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         >
                           <Button
                             variant="ghost"
-                            onClick={() => onChannelSelect(dm.id)}
+                            onClick={() => handleDirectMessageSelect(dm.id)}
                             className={`w-full justify-start text-white hover:bg-white/10 h-9 text-base font-normal px-2 transition-all duration-200 ${
                               isActive ? 'bg-white/20 font-medium' : ''
                             }`}
@@ -341,6 +350,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 </motion.div>
                                 <span className="truncate">{dm.name}</span>
                               </div>
+                              {dm.role === 'admin' && (
+                                <span className="text-xs text-white/60">Admin</span>
+                              )}
                             </div>
                           </Button>
                         </motion.div>

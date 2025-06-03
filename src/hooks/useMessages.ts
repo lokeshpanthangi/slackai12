@@ -78,9 +78,63 @@ export const useMessages = (channelId?: string) => {
           table: 'messages',
           filter: `channel_id=eq.${channelId}`
         },
-        (payload) => {
+        async (payload) => {
           console.log('New message received:', payload.new);
-          setMessages(prev => [...prev, payload.new as DatabaseMessage]);
+          
+          // Fetch the complete message with profile data
+          const { data: messageWithProfile } = await supabase
+            .from('messages')
+            .select(`
+              *,
+              profiles(display_name, avatar)
+            `)
+            .eq('id', payload.new.id)
+            .single();
+          
+          if (messageWithProfile) {
+            setMessages(prev => [...prev, messageWithProfile]);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`
+        },
+        async (payload) => {
+          console.log('Message updated:', payload.new);
+          
+          // Fetch the complete updated message with profile data
+          const { data: messageWithProfile } = await supabase
+            .from('messages')
+            .select(`
+              *,
+              profiles(display_name, avatar)
+            `)
+            .eq('id', payload.new.id)
+            .single();
+          
+          if (messageWithProfile) {
+            setMessages(prev => prev.map(msg => 
+              msg.id === messageWithProfile.id ? messageWithProfile : msg
+            ));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`
+        },
+        (payload) => {
+          console.log('Message deleted:', payload.old);
+          setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
         }
       )
       .subscribe();
