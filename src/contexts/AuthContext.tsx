@@ -76,17 +76,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       userEmail: user?.email
     });
     
-    // Store authentication state in localStorage for persistence
-    if (isAuthenticated) {
-      localStorage.setItem('isAuthenticated', 'true');
-    } else {
-      localStorage.removeItem('isAuthenticated');
-    }
-    
     // Store workspace selection state
     if (workspace) {
       localStorage.setItem('workspace_selected', 'true');
       localStorage.setItem('current_workspace_id', workspace.id);
+      localStorage.setItem('slack_workspace', JSON.stringify(workspace));
     } else {
       localStorage.removeItem('workspace_selected');
       localStorage.removeItem('current_workspace_id');
@@ -108,27 +102,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('User signed in, loading profile...');
           await loadUserProfile(session.user);
-          
-          // Set authentication flag in localStorage
-          localStorage.setItem('isAuthenticated', 'true');
-          localStorage.setItem('auth_timestamp', Date.now().toString());
-          
-          // Force a state update to ensure components re-render
-          setUser(prevUser => {
-            if (prevUser) {
-              return {...prevUser}; // Create a new object to trigger state update
-            }
-            return prevUser;
-          });
         } else if (event === 'SIGNED_OUT') {
           console.log('User signed out, clearing state...');
           setUser(null);
           setWorkspaceState(null);
           localStorage.removeItem('slack_workspace');
           localStorage.removeItem('workspace_selected');
-          localStorage.removeItem('isAuthenticated');
-          localStorage.removeItem('auth_timestamp');
-          localStorage.removeItem('supabase.auth.token');
+          localStorage.removeItem('current_workspace_id');
         }
         
         if (mounted) {
@@ -140,12 +120,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // THEN check for existing session
     const checkSession = async () => {
       try {
-        // First check localStorage for auth flags
-        const localAuthFlag = localStorage.getItem('isAuthenticated');
-        const authTimestamp = localStorage.getItem('auth_timestamp');
-        
-        console.log('Local auth check:', { localAuthFlag, authTimestamp });
-        
         const { data: { session } } = await supabase.auth.getSession();
         console.log('Initial session check:', session?.user?.email);
         
@@ -156,18 +130,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (session?.user) {
           console.log('Found existing session, loading user profile...');
           await loadUserProfile(session.user);
-        } else if (localAuthFlag === 'true') {
-          console.log('No session but auth flag found, attempting to refresh session...');
-          // Try to refresh the session
-          const { data } = await supabase.auth.refreshSession();
-          if (data.session) {
-            console.log('Session refreshed successfully');
-            setSession(data.session);
-            await loadUserProfile(data.session.user);
-          }
         }
         
-        // Also check localStorage for workspace selection
+        // Check localStorage for workspace selection
         const savedWorkspace = localStorage.getItem('slack_workspace');
         if (savedWorkspace && mounted) {
           try {
@@ -266,59 +231,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       console.log('Login successful:', data.user?.email);
-      console.log('Session data:', data.session);
+      // The auth state listener will handle setting user and session
       
-      // Set authentication flags in localStorage
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('auth_timestamp', Date.now().toString());
-      
-      // Explicitly set the session
-      if (data.session) {
-        setSession(data.session);
-        // Store session in localStorage for persistence
-        localStorage.setItem('supabase.auth.token', JSON.stringify({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token
-        }));
-      } else {
-        console.error('No session returned from login');
-      }
-      
-      // Load user profile
-      if (data.user) {
-        console.log('Loading user profile after login');
-        await loadUserProfile(data.user);
-        
-        // Manually trigger a state update to ensure isAuthenticated becomes true
-        setUser(prevUser => {
-          if (prevUser) {
-            return {...prevUser}; // Create a new object to trigger state update
-          }
-          return prevUser;
-        });
-      } else {
-        console.error('No user returned from login');
-      }
-      
-      // Force a refresh of the authentication state
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData.session) {
-        console.log('Refreshed session after login:', sessionData.session.user?.email);
-        setSession(sessionData.session);
-      }
-      
-      // Add a small delay to ensure state updates are processed
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Verify authentication state after login
-      console.log('Authentication state after login:', { 
-        isAuthenticated: !!sessionData.session && !!user,
-        hasUser: !!user, 
-        hasSession: !!sessionData.session,
-        userEmail: user?.email || data.user?.email
-      });
-      
-      return data;
     } catch (error: any) {
       console.error('Login error:', error);
       throw new Error(error?.message || 'Login failed');
@@ -363,9 +277,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.error('Error creating profile during signup:', profileError);
         }
         
-        // Set session and user data immediately
-        setSession(data.session);
-        await loadUserProfile(data.user);
+        // The auth state listener will handle setting user and session
       }
     } catch (error: any) {
       console.error('Signup error:', error);
@@ -383,6 +295,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setWorkspaceState(null);
       localStorage.removeItem('slack_workspace');
       localStorage.removeItem('workspace_selected');
+      localStorage.removeItem('current_workspace_id');
       
       console.log('Logout successful');
     } catch (error) {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -22,27 +23,13 @@ const Index: React.FC = () => {
     });
   }, [isAuthenticated, isLoading, user, session]);
   
-  // Separate useEffect for navigation to avoid race conditions
+  // Handle navigation when user becomes authenticated
   useEffect(() => {
-    // If authenticated, redirect to workspaces page
     if (isAuthenticated && !isLoading) {
       console.log('User is authenticated, redirecting to workspaces page');
-      
-      // Check if we have a workspace selected in localStorage
-      const hasWorkspace = localStorage.getItem('workspace_selected') === 'true';
-      const workspaceData = localStorage.getItem('slack_workspace');
-      
-      if (hasWorkspace && workspaceData) {
-        console.log('Workspace found in localStorage, redirecting to dashboard');
-        // Redirect to dashboard if workspace is selected
-        window.location.href = '/';
-      } else {
-        console.log('No workspace selected, redirecting to workspaces page');
-        // Force navigation to workspaces page
-        window.location.href = '/workspaces';
-      }
+      navigate('/workspaces', { replace: true });
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, navigate]);
 
   if (isLoading) {
     return (

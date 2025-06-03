@@ -28,7 +28,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,26 +55,16 @@ const LoginForm: React.FC<LoginFormProps> = ({
       setIsLoading(true);
       console.log('Submitting login form with email:', email);
       
-      // Call login function
-      const result = await login(email, password);
-      console.log('Login successful, result:', result);
+      // Call login function - navigation will be handled by Index component
+      await login(email, password);
+      console.log('Login successful');
       
       // Show success message
       toast({
         title: "Login Successful",
-        description: "Redirecting to your workspace...",
+        description: "Welcome back!",
         variant: "default",
       });
-      
-      // Store login success in localStorage to help with state persistence
-      localStorage.setItem('auth_success', 'true');
-      localStorage.setItem('auth_timestamp', Date.now().toString());
-      
-      // Force a page reload after a short delay to ensure state is updated
-      setTimeout(() => {
-        // This will trigger the useEffect in Index.tsx which will handle redirection
-        window.location.reload();
-      }, 800);
       
     } catch (error: any) {
       console.error('Login error:', error);
@@ -127,12 +116,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-slack-md">
-                <p className="text-13 text-red-600">{error}</p>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="email" className="text-15 font-bold text-slack-text-primary">

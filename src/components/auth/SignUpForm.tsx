@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -5,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Building } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 
 interface SignUpFormProps {
   onBack: () => void;
@@ -18,6 +20,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({
   isCreatingWorkspace = false
 }) => {
   const { signup } = useAuth();
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -27,51 +30,89 @@ const SignUpForm: React.FC<SignUpFormProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreeToTerms) {
-      setError('Please agree to the Terms of Service and Privacy Policy');
+      toast({
+        title: "Error",
+        description: "Please agree to the Terms of Service and Privacy Policy",
+        variant: "destructive",
+      });
       return;
     }
 
     // Validate form data
     if (!formData.displayName.trim()) {
-      setError('Please enter your full name');
+      toast({
+        title: "Error",
+        description: "Please enter your full name",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!formData.email.trim()) {
-      setError('Please enter your email address');
+      toast({
+        title: "Error",
+        description: "Please enter your email address",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!formData.password) {
-      setError('Please enter a password');
+      toast({
+        title: "Error",
+        description: "Please enter a password",
+        variant: "destructive",
+      });
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
       return;
     }
 
-    setError('');
     setIsLoading(true);
 
     try {
       console.log('Submitting signup form for:', formData.email);
       await signup(formData.email, formData.password, formData.displayName);
       console.log('Signup form submission successful');
+      
+      // Show success message
+      toast({
+        title: "Account Created",
+        description: "Welcome to Slack!",
+        variant: "default",
+      });
+      
     } catch (err: any) {
       console.error('Signup form submission error:', err);
       if (err.message && err.message.includes('already registered')) {
-        setError('This email is already registered. Please sign in instead.');
+        toast({
+          title: "Error",
+          description: "This email is already registered. Please sign in instead.",
+          variant: "destructive",
+        });
       } else if (err.message) {
-        setError(err.message);
+        toast({
+          title: "Error",
+          description: err.message,
+          variant: "destructive",
+        });
       } else {
-        setError('Failed to create account. Please try again.');
+        toast({
+          title: "Error",
+          description: "Failed to create account. Please try again.",
+          variant: "destructive",
+        });
       }
     } finally {
       setIsLoading(false);
@@ -126,12 +167,6 @@ const SignUpForm: React.FC<SignUpFormProps> = ({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-slack-md">
-                <p className="text-13 text-red-600">{error}</p>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-4">
               {isCreatingWorkspace && (
                 <div className="space-y-2">
