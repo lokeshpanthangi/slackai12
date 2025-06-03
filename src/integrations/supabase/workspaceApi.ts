@@ -1,3 +1,4 @@
+
 import { supabase } from './client';
 
 export interface WorkspaceCreateData {
@@ -19,16 +20,14 @@ export interface Workspace {
 }
 
 /**
- * Create a workspace directly using a custom approach to avoid policy issues
+ * Create a workspace and automatically add the creator as an admin member
  */
 export const createWorkspace = async (data: WorkspaceCreateData): Promise<Workspace> => {
   try {
     console.log('Creating workspace with data:', data);
     
-    // Try direct insert first since the RPC function might not be set up yet
-    console.log('Attempting direct insert...');
-    
-    const { data: workspace, error: insertError } = await supabase
+    // First, create the workspace
+    const { data: workspace, error: workspaceError } = await supabase
       .from('workspaces')
       .insert({
         name: data.name,
@@ -39,84 +38,108 @@ export const createWorkspace = async (data: WorkspaceCreateData): Promise<Worksp
       .select()
       .single();
       
-    if (insertError) {
-      console.error('Error in direct insert:', insertError);
-      
-      // If direct insert fails, try RPC function
-      console.log('Direct insert failed, trying RPC function...');
-      
-      const { data: rpcWorkspace, error } = await supabase.rpc('create_workspace_direct', {
-        workspace_name: data.name,
-        workspace_url: data.url,
-        workspace_slug: data.slug,
-        user_id: data.created_by
-      });
-      
-      if (error) {
-        console.error('Error creating workspace via RPC:', error);
-        throw error;
-      }
-      
-      console.log('RPC function succeeded:', rpcWorkspace);
-      return rpcWorkspace;
+    if (workspaceError) {
+      console.error('Error creating workspace:', workspaceError);
+      throw workspaceError;
     }
     
-    console.log('Direct insert succeeded:', workspace);
+    console.log('Workspace created successfully:', workspace);
+    
+    // Now add the creator as an admin member
+    const { error: memberError } = await supabase
+      .from('workspace_members')
+      .insert({
+        workspace_id: workspace.id,
+        user_id: data.created_by,
+        role: 'admin'
+      });
+      
+    if (memberError) {
+      console.error('Error adding workspace member:', memberError);
+      // Even if member creation fails, we still return the workspace
+      // The user can manually be added later
+    } else {
+      console.log('Workspace member added successfully');
+    }
+    
     return workspace;
   } catch (error) {
-    console.error('All workspace creation methods failed:', error);
+    console.error('Workspace creation failed:', error);
     throw new Error('Failed to create workspace: ' + (error.message || 'Unknown error'));
   }
 };
 
 /**
- * Get workspaces for a user
+ * Get workspaces for a user (both created and member of)
  */
 export const getUserWorkspaces = async (userId: string): Promise<Workspace[]> => {
   try {
     console.log('getUserWorkspaces called with userId:', userId);
     
-    // First try with direct query
-    const { data, error } = await supabase
-      .from('workspaces')
-      .select('*')
-      .eq('created_by', userId);
+    // Query for workspaces where user is a member
+    const { data: memberWorkspaces, error: memberError } = await supabase
+      .from('workspace_members')
+      .select(`
+        workspace_id,
+        role,
+        workspaces!inner (
+          id,
+          name,
+          url,
+          slug,
+          icon,
+          created_by,
+          created_at,
+          updated_at
+        )
+      `)
+      .eq('user_id', userId);
+
+    if (memberError) {
+      console.error('Error fetching workspace memberships:', memberError);
       
-    if (error) {
-      console.error('Error fetching user workspaces:', error);
-      throw error;
-    }
-    
-    console.log('Workspaces fetched successfully:', data);
-    
-    if (!data || data.length === 0) {
-      console.log('No workspaces found for user, trying alternative query...');
-      
-      // Try an alternative query without filters to see if any workspaces exist
-      const { data: allWorkspaces, error: allError } = await supabase
+      // Fallback: try to get workspaces created by user
+      console.log('Trying fallback approach - fetching workspaces created by user...');
+      const { data: ownedWorkspaces, error: ownedError } = await supabase
         .from('workspaces')
-        .select('*');
+        .select('*')
+        .eq('created_by', userId);
         
-      if (allError) {
-        console.error('Error fetching all workspaces:', allError);
-      } else {
-        console.log('All workspaces in the database:', allWorkspaces);
-        console.log('Looking for workspaces with created_by matching:', userId);
-        
-        // Manually filter to see if there's a type mismatch issue
-        const userWorkspaces = allWorkspaces.filter(ws => {
-          console.log(`Comparing workspace.created_by: ${ws.created_by} (${typeof ws.created_by}) with userId: ${userId} (${typeof userId})`);
-          return ws.created_by === userId;
-        });
-        
-        if (userWorkspaces.length > 0) {
-          console.log('Found workspaces after manual filtering:', userWorkspaces);
-          return userWorkspaces;
-        }
+      if (ownedError) {
+        console.error('Fallback query also failed:', ownedError);
+        throw ownedError;
       }
+      
+      console.log('Fallback query succeeded, owned workspaces:', ownedWorkspaces);
+      return ownedWorkspaces || [];
     }
-    
-    return data || [];
+
+    console.log('Raw workspace memberships:', memberWorkspaces);
+
+    // Extract workspace data from the join
+    const workspaceData: Workspace[] = memberWorkspaces
+      ?.map(member => {
+        // Extract the workspace from the join result
+        const workspace = (member as any).workspaces;
+        
+        if (workspace && typeof workspace === 'object') {
+          return {
+            id: workspace.id,
+            name: workspace.name,
+            url: workspace.url,
+            slug: workspace.slug,
+            icon: workspace.icon,
+            created_by: workspace.created_by,
+            created_at: workspace.created_at,
+            updated_at: workspace.updated_at
+          } as Workspace;
+        }
+        return null;
+      })
+      .filter((workspace): workspace is Workspace => workspace !== null) || [];
+
+    console.log('Processed workspaces:', workspaceData);
+    return workspaceData;
   } catch (error) {
     console.error('Error in getUserWorkspaces:', error);
     throw error;

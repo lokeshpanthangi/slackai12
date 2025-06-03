@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,12 +13,6 @@ export interface DatabaseWorkspace {
   created_at: string;
   updated_at: string;
   slug?: string;
-}
-
-interface WorkspaceMemberRow {
-  workspace_id: string;
-  role: string;
-  workspaces: DatabaseWorkspace[]; // This is an array, not a single object
 }
 
 export const useWorkspaces = () => {
@@ -58,71 +53,8 @@ export const useWorkspaces = () => {
       console.log('Fetching workspaces for user ID:', userId);
       setLoading(true);
       
-      // Query workspaces where user is a member
-      const { data: memberWorkspaces, error: memberError } = await supabase
-        .from('workspace_members')
-        .select(`
-          workspace_id,
-          role,
-          workspaces!inner (
-            id,
-            name,
-            url,
-            slug,
-            icon,
-            created_by,
-            created_at,
-            updated_at
-          )
-        `)
-        .eq('user_id', userId);
-
-      if (memberError) {
-        console.error('Error fetching workspace memberships:', memberError);
-        
-        // If the join query fails, try a fallback approach
-        console.log('Trying fallback approach - fetching workspaces created by user...');
-        const { data: ownedWorkspaces, error: ownedError } = await supabase
-          .from('workspaces')
-          .select('*')
-          .eq('created_by', userId);
-          
-        if (ownedError) {
-          console.error('Fallback query also failed:', ownedError);
-          throw ownedError;
-        }
-        
-        console.log('Fallback query succeeded, owned workspaces:', ownedWorkspaces);
-        setWorkspaces(ownedWorkspaces || []);
-        return;
-      }
-
-      console.log('Raw workspace memberships:', memberWorkspaces);
-
-      // Extract workspace data from the join with proper typing
-      const workspaceData: DatabaseWorkspace[] = (memberWorkspaces as WorkspaceMemberRow[])
-        ?.map(member => {
-          // Since workspaces is an array, we need to get the first element
-          const workspace = Array.isArray(member.workspaces) ? member.workspaces[0] : member.workspaces;
-          
-          // Ensure workspace exists and has the required properties
-          if (workspace && typeof workspace === 'object') {
-            return {
-              id: workspace.id,
-              name: workspace.name,
-              url: workspace.url,
-              slug: workspace.slug,
-              icon: workspace.icon,
-              created_by: workspace.created_by,
-              created_at: workspace.created_at,
-              updated_at: workspace.updated_at
-            } as DatabaseWorkspace;
-          }
-          return null;
-        })
-        .filter((workspace): workspace is DatabaseWorkspace => workspace !== null) || [];
-
-      console.log('Processed workspaces:', workspaceData);
+      const workspaceData = await getUserWorkspaces(userId);
+      console.log('Fetched workspaces:', workspaceData);
       setWorkspaces(workspaceData);
     } catch (error) {
       console.error('Error fetching workspaces:', error);
@@ -152,13 +84,13 @@ export const useWorkspaces = () => {
         created_by: userId
       };
       
-      console.log('Workspace data to insert:', workspaceData);
+      console.log('Workspace data to create:', workspaceData);
       
-      // Use our dedicated API function to create the workspace
+      // Use our API function to create the workspace (this will also add the user as a member)
       const workspace = await apiCreateWorkspace(workspaceData);
       console.log('Workspace created successfully:', workspace);
       
-      // Wait a moment for the trigger to complete
+      // Wait a moment for any triggers to complete
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Refresh the workspaces list
@@ -180,9 +112,8 @@ export const useWorkspaces = () => {
     try {
       console.log('Joining workspace with URL:', workspaceUrl);
       
-      // For now, we'll just search for a workspace with the given URL
-      // In a real implementation, you would need a proper invitation system
-      const { data, error } = await supabase
+      // Find the workspace by URL
+      const { data: workspace, error } = await supabase
         .from('workspaces')
         .select('*')
         .eq('url', workspaceUrl)
@@ -190,10 +121,19 @@ export const useWorkspaces = () => {
 
       if (error) throw error;
       
-      // In a real implementation, you would add the user to a workspace_members table
-      // For now, we'll just return the found workspace
+      // Add the user to the workspace_members table
+      const { error: memberError } = await supabase
+        .from('workspace_members')
+        .insert({
+          workspace_id: workspace.id,
+          user_id: userId,
+          role: 'member'
+        });
+        
+      if (memberError) throw memberError;
+      
       await fetchWorkspaces(userId);
-      return data;
+      return workspace;
     } catch (error) {
       console.error('Error joining workspace:', error);
       throw error;
