@@ -16,7 +16,7 @@ export interface DatabaseWorkspace {
 
 interface WorkspaceMemberResult {
   workspace_id: string;
-  workspaces: DatabaseWorkspace; // This should be a single object, not an array
+  workspaces: DatabaseWorkspace | null;
 }
 
 export const useWorkspaces = () => {
@@ -40,14 +40,17 @@ export const useWorkspaces = () => {
         .from('workspace_members')
         .select(`
           workspace_id,
-          workspaces(*)
+          workspaces!inner(*)
         `)
         .eq('user_id', user?.id);
 
       if (error) throw error;
 
-      // Fix: properly extract workspace data from the joined query result with correct typing
-      const workspaceData = (data as WorkspaceMemberResult[])?.map(item => item.workspaces).filter(Boolean) || [];
+      // Extract workspace data from the joined query result
+      const workspaceData = (data as WorkspaceMemberResult[])
+        ?.map(item => item.workspaces)
+        .filter((workspace): workspace is DatabaseWorkspace => workspace !== null) || [];
+      
       setWorkspaces(workspaceData);
     } catch (error) {
       console.error('Error fetching workspaces:', error);
