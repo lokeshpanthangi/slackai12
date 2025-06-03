@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +13,7 @@ import {
   Link2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { ToneImpactMeter } from './ToneImpactMeter';
+import ToneImpactMeter from './ToneImpactMeter';
 import { analyzeTone } from '@/services/toneAnalyzer';
 
 interface MessageInputProps {
@@ -23,6 +22,8 @@ interface MessageInputProps {
   onSendMessage?: (content: string, parentMessageId?: string) => Promise<any>;
   threadParentId?: string;
   onFileUpload?: (files: FileList) => void;
+  channelMessages?: any[];
+  channelName?: string;
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
@@ -30,12 +31,15 @@ const MessageInput: React.FC<MessageInputProps> = ({
   placeholder = "Type a message...",
   onSendMessage,
   threadParentId,
-  onFileUpload
+  onFileUpload,
+  channelMessages = [],
+  channelName = ''
 }) => {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toneData, setToneData] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showFormatting, setShowFormatting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,20 +48,24 @@ const MessageInput: React.FC<MessageInputProps> = ({
     const analyzeMessageTone = async () => {
       if (message.trim().length > 10) {
         try {
-          const analysis = await analyzeTone(message);
+          setIsAnalyzing(true);
+          const analysis = await analyzeTone(message, channelMessages, channelName);
           setToneData(analysis);
         } catch (error) {
           console.error('Tone analysis failed:', error);
           setToneData(null);
+        } finally {
+          setIsAnalyzing(false);
         }
       } else {
         setToneData(null);
+        setIsAnalyzing(false);
       }
     };
 
     const debounceTimer = setTimeout(analyzeMessageTone, 500);
     return () => clearTimeout(debounceTimer);
-  }, [message]);
+  }, [message, channelMessages, channelName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,9 +168,13 @@ const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div className="w-full">
       {/* Tone Impact Meter */}
-      {toneData && (
+      {(toneData || isAnalyzing) && (
         <div className="mb-2">
-          <ToneImpactMeter toneData={toneData} />
+          <ToneImpactMeter 
+            analysis={toneData} 
+            isLoading={isAnalyzing}
+            message={message}
+          />
         </div>
       )}
       

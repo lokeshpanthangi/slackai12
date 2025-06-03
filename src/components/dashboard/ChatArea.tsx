@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -297,6 +296,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({ channel, user, channels = [] }) => 
             channelId={channel}
             placeholder={`Message ${channel.startsWith('dm-') ? getChannelName() : `#${getChannelName()}`}`}
             onSendMessage={sendMessage}
+            channelMessages={formattedMessages}
+            channelName={getChannelName()}
           />
         </div>
       </div>
