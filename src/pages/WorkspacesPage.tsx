@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspaces } from '@/hooks/useWorkspaces';
@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, LogOut } from 'lucide-react';
+import { Plus, Users, LogOut, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const WorkspacesPage: React.FC = () => {
   const { user, logout, setWorkspace } = useAuth();
-  const { workspaces, setWorkspaces, loading, createWorkspace, joinWorkspace } = useWorkspaces();
+  const { workspaces, setWorkspaces, loading, createWorkspace, joinWorkspace, refetch } = useWorkspaces();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [joinWorkspaceUrl, setJoinWorkspaceUrl] = useState('');
@@ -24,6 +24,24 @@ const WorkspacesPage: React.FC = () => {
   });
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+
+  // Add debugging info on mount
+  useEffect(() => {
+    console.log('WorkspacesPage mounted with auth state:', {
+      user: user ? { id: user.id, email: user.email } : null,
+      workspacesCount: workspaces.length,
+      loading
+    });
+  }, [user, workspaces, loading]);
+
+  const handleRefresh = () => {
+    console.log('Manual refresh triggered');
+    refetch();
+    toast({
+      title: 'Refreshing',
+      description: 'Fetching latest workspaces...',
+    });
+  };
 
   const handleLaunchWorkspace = (workspaceId: string) => {
     try {
@@ -160,6 +178,7 @@ const WorkspacesPage: React.FC = () => {
             <div className="w-8 h-8 border-2 border-slack-aubergine border-t-transparent rounded-full animate-spin" />
           </div>
           <p className="text-white">Loading workspaces...</p>
+          <p className="text-white/60 text-sm mt-2">User: {user?.email || 'Not loaded'}</p>
         </div>
       </div>
     );
@@ -179,14 +198,24 @@ const WorkspacesPage: React.FC = () => {
               <span className="text-white/60 text-sm">from Salesforce</span>
             </div>
 
-            <Button
-              variant="ghost"
-              onClick={logout}
-              className="text-white/80 hover:text-white hover:bg-white/10"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                onClick={handleRefresh}
+                className="text-white/80 hover:text-white hover:bg-white/10"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={logout}
+                className="text-white/80 hover:text-white hover:bg-white/10"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -200,6 +229,17 @@ const WorkspacesPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Debug Info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-8 p-4 bg-black/20 rounded-lg text-white text-xs">
+            <p>Debug Info:</p>
+            <p>User ID: {user?.id || 'null'}</p>
+            <p>User Email: {user?.email || 'null'}</p>
+            <p>Workspaces Count: {workspaces.length}</p>
+            <p>Loading: {loading.toString()}</p>
+          </div>
+        )}
+
         {/* User Workspaces Section */}
         <div className="mb-12">
           <div className="bg-white/95 backdrop-blur-sm rounded-lg p-8 shadow-xl">
@@ -212,6 +252,14 @@ const WorkspacesPage: React.FC = () => {
                 <p className="text-slack-text-secondary mb-4">
                   You don't have any workspaces yet. Create one or join an existing workspace to get started.
                 </p>
+                <Button
+                  onClick={handleRefresh}
+                  variant="outline"
+                  className="mr-2"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Try Refreshing
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">

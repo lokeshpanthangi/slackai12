@@ -28,14 +28,25 @@ export const useWorkspaces = () => {
   };
 
   useEffect(() => {
-    // Only fetch workspaces when we have a valid session
-    if (session?.user?.id) {
-      console.log('Session or refresh trigger changed, fetching workspaces...');
-      fetchWorkspaces(session.user.id);
+    console.log('useWorkspaces effect triggered:', { 
+      sessionExists: !!session, 
+      userExists: !!user, 
+      userId: session?.user?.id || user?.id,
+      refreshTrigger 
+    });
+
+    // Try to get user ID from either session or user object
+    const userId = session?.user?.id || user?.id;
+    
+    if (userId) {
+      console.log('Found user ID, fetching workspaces:', userId);
+      fetchWorkspaces(userId);
     } else {
+      console.log('No user ID found, setting loading to false');
       setLoading(false);
+      setWorkspaces([]);
     }
-  }, [session, refreshTrigger]);
+  }, [session, user, refreshTrigger]);
 
   const fetchWorkspaces = async (userId: string) => {
     try {
@@ -63,7 +74,22 @@ export const useWorkspaces = () => {
 
       if (memberError) {
         console.error('Error fetching workspace memberships:', memberError);
-        throw memberError;
+        
+        // If the join query fails, try a fallback approach
+        console.log('Trying fallback approach - fetching workspaces created by user...');
+        const { data: ownedWorkspaces, error: ownedError } = await supabase
+          .from('workspaces')
+          .select('*')
+          .eq('created_by', userId);
+          
+        if (ownedError) {
+          console.error('Fallback query also failed:', ownedError);
+          throw ownedError;
+        }
+        
+        console.log('Fallback query succeeded, owned workspaces:', ownedWorkspaces);
+        setWorkspaces(ownedWorkspaces || []);
+        return;
       }
 
       console.log('Raw workspace memberships:', memberWorkspaces);
@@ -102,12 +128,12 @@ export const useWorkspaces = () => {
   };
 
   const createWorkspace = async (name: string, url: string, slug?: string) => {
-    if (!session?.user?.id) {
+    const userId = session?.user?.id || user?.id;
+    if (!userId) {
       throw new Error('User not authenticated');
     }
     
     try {
-      const userId = session.user.id;
       // Generate a slug if not provided
       const workspaceSlug = slug || name.toLowerCase().replace(/\s+/g, '-');
       
@@ -141,12 +167,12 @@ export const useWorkspaces = () => {
   };
 
   const joinWorkspace = async (workspaceUrl: string) => {
-    if (!session?.user?.id) {
+    const userId = session?.user?.id || user?.id;
+    if (!userId) {
       throw new Error('User not authenticated');
     }
     
     try {
-      const userId = session.user.id;
       console.log('Joining workspace with URL:', workspaceUrl);
       
       // For now, we'll just search for a workspace with the given URL
@@ -175,7 +201,12 @@ export const useWorkspaces = () => {
     loading,
     createWorkspace,
     joinWorkspace,
-    refetch: () => fetchWorkspaces(session?.user?.id || ''),
+    refetch: () => {
+      const userId = session?.user?.id || user?.id;
+      if (userId) {
+        fetchWorkspaces(userId);
+      }
+    },
     refreshWorkspaces
   };
 };
