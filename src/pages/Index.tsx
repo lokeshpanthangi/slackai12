@@ -1,15 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import LoginForm from '@/components/auth/LoginForm';
 import SignUpForm from '@/components/auth/SignUpForm';
-import WorkspacesPage from './WorkspacesPage';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 
 type AuthStep = 'login' | 'signup';
 
 const Index: React.FC = () => {
-  const { isAuthenticated, isLoading, user, workspace } = useAuth();
+  const { isAuthenticated, isLoading, user, session } = useAuth();
   const [authStep, setAuthStep] = useState<AuthStep>('login');
+  const navigate = useNavigate();
+  
+  // Debug authentication state in Index component
+  useEffect(() => {
+    console.log('Index component auth state:', { 
+      isAuthenticated, 
+      isLoading, 
+      hasUser: !!user, 
+      hasSession: !!session,
+      userEmail: user?.email
+    });
+  }, [isAuthenticated, isLoading, user, session]);
+  
+  // Separate useEffect for navigation to avoid race conditions
+  useEffect(() => {
+    // If authenticated, redirect to workspaces page
+    if (isAuthenticated && !isLoading) {
+      console.log('User is authenticated, redirecting to workspaces page');
+      
+      // Check if we have a workspace selected in localStorage
+      const hasWorkspace = localStorage.getItem('workspace_selected') === 'true';
+      const workspaceData = localStorage.getItem('slack_workspace');
+      
+      if (hasWorkspace && workspaceData) {
+        console.log('Workspace found in localStorage, redirecting to dashboard');
+        // Redirect to dashboard if workspace is selected
+        window.location.href = '/';
+      } else {
+        console.log('No workspace selected, redirecting to workspaces page');
+        // Force navigation to workspaces page
+        window.location.href = '/workspaces';
+      }
+    }
+  }, [isAuthenticated, isLoading]);
 
   if (isLoading) {
     return (
@@ -23,21 +56,7 @@ const Index: React.FC = () => {
       </div>
     );
   }
-
-  // If user is authenticated
-  if (isAuthenticated) {
-    // Check if workspace is selected
-    const workspaceSelected = localStorage.getItem('workspace_selected') === 'true' || !!workspace;
-    
-    // If workspace is selected, show dashboard
-    if (workspaceSelected && workspace) {
-      return <DashboardLayout />;
-    } else {
-      // Otherwise show workspaces page
-      return <WorkspacesPage />;
-    }
-  }
-
+  
   const handleSwitchToSignUp = () => {
     setAuthStep('signup');
   };

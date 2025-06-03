@@ -36,13 +36,43 @@ const SignUpForm: React.FC<SignUpFormProps> = ({
       return;
     }
 
+    // Validate form data
+    if (!formData.displayName.trim()) {
+      setError('Please enter your full name');
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    if (!formData.password) {
+      setError('Please enter a password');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
     setError('');
     setIsLoading(true);
 
     try {
+      console.log('Submitting signup form for:', formData.email);
       await signup(formData.email, formData.password, formData.displayName);
-    } catch (err) {
-      setError('Failed to create account. Please try again.');
+      console.log('Signup form submission successful');
+    } catch (err: any) {
+      console.error('Signup form submission error:', err);
+      if (err.message && err.message.includes('already registered')) {
+        setError('This email is already registered. Please sign in instead.');
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError('Failed to create account. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

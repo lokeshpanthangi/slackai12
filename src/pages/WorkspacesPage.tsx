@@ -27,23 +27,45 @@ const WorkspacesPage: React.FC = () => {
   const [isJoining, setIsJoining] = useState(false);
 
   const handleLaunchWorkspace = (workspaceId: string) => {
-    console.log('Launching workspace:', workspaceId);
-    const selectedWorkspace = workspaces.find(ws => ws.id === workspaceId);
-    if (selectedWorkspace) {
-      // Create workspace data compatible with auth context
-      const workspaceData = {
-        id: selectedWorkspace.id,
-        name: selectedWorkspace.name,
-        url: selectedWorkspace.url,
-        slug: selectedWorkspace.slug,
-        isAdmin: selectedWorkspace.created_by === user?.id
-      };
-      
-      // Set the workspace in auth context
-      setWorkspace(workspaceData);
-      
-      // Navigate to dashboard
-      navigate('/', { replace: true });
+    try {
+      console.log('Launching workspace:', workspaceId);
+      const selectedWorkspace = workspaces.find(ws => ws.id === workspaceId);
+      if (selectedWorkspace) {
+        // Create workspace data compatible with auth context
+        const workspaceData = {
+          id: selectedWorkspace.id,
+          name: selectedWorkspace.name,
+          url: selectedWorkspace.url,
+          slug: selectedWorkspace.slug,
+          isAdmin: selectedWorkspace.created_by === user?.id
+        };
+        
+        console.log('Setting workspace in auth context:', workspaceData);
+        // Set the workspace in auth context
+        setWorkspace(workspaceData);
+        
+        // Store workspace in localStorage
+        localStorage.setItem('slack_workspace', JSON.stringify(workspaceData));
+        localStorage.setItem('workspace_selected', 'true');
+        
+        // Show success message
+        toast({
+          title: 'Workspace Selected',
+          description: `Launching ${selectedWorkspace.name} workspace...`,
+        });
+        
+        // Use direct window location change for more reliable navigation
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error launching workspace:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to launch workspace. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
 

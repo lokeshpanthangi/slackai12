@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff, Mail, Lock, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 
 interface LoginFormProps {
   workspaceUrl: string;
@@ -21,6 +22,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
   onSignUp
 }) => {
   const { login } = useAuth();
+  const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,13 +32,58 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
+    
+    // Validate form
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Email is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!password) {
+      toast({
+        title: "Error",
+        description: "Password is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
-      await login(email, password);
-    } catch (err) {
-      setError('Invalid email or password. Please try again.');
+      setIsLoading(true);
+      console.log('Submitting login form with email:', email);
+      
+      // Call login function
+      const result = await login(email, password);
+      console.log('Login successful, result:', result);
+      
+      // Show success message
+      toast({
+        title: "Login Successful",
+        description: "Redirecting to your workspace...",
+        variant: "default",
+      });
+      
+      // Store login success in localStorage to help with state persistence
+      localStorage.setItem('auth_success', 'true');
+      localStorage.setItem('auth_timestamp', Date.now().toString());
+      
+      // Force a page reload after a short delay to ensure state is updated
+      setTimeout(() => {
+        // This will trigger the useEffect in Index.tsx which will handle redirection
+        window.location.reload();
+      }, 800);
+      
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid credentials",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
